@@ -78,6 +78,7 @@ function mapDbConfig(row) {
     pedidoMinimo: Number(row.pedido_minimo) || 0, mostrarEstoque: !!row.mostrar_estoque,
     lojaAberta: row.loja_aberta !== false, horarios: row.horarios || [],
     diasEntrega: row.dias_entrega || [], janelasHorario: row.janelas_horario || [],
+    mensagemWhatsapp: row.mensagem_whatsapp || DEFAULT_MENSAGEM_WHATSAPP,
   };
 }
 function toDbConfig(c) {
@@ -87,8 +88,28 @@ function toDbConfig(c) {
     pedido_minimo: Number(c.pedidoMinimo) || 0, mostrar_estoque: !!c.mostrarEstoque,
     loja_aberta: c.lojaAberta !== false, horarios: c.horarios || [],
     dias_entrega: c.diasEntrega || [], janelas_horario: c.janelasHorario || [],
+    mensagem_whatsapp: c.mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP,
   };
 }
+const DEFAULT_MENSAGEM_WHATSAPP = `PEDIDO — VAGO
+{lote}
+
+ITENS:
+{itens}
+
+SUBTOTAL: {subtotal}
+{frete_linha}
+TOTAL: {total}
+
+CLIENTE: {cliente}
+TELEFONE: {telefone}
+E-MAIL: {email}
+ENTREGA: {entrega_tipo}
+{endereco_linha}
+DIA/HORÁRIO: {dia_horario}
+PAGAMENTO: {pagamento}
+
+Aguardo confirmação e envio do pagamento.`;
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const DEFAULT_HORARIOS = [
   { dia: 0, ativo: false, abre: "09:00", fecha: "18:00" },
@@ -198,6 +219,7 @@ export default function App() {
   const [horarios, setHorarios] = useState(DEFAULT_HORARIOS);
   const [diasEntrega, setDiasEntrega] = useState(DEFAULT_DIAS_ENTREGA);
   const [janelasHorario, setJanelasHorario] = useState(DEFAULT_JANELAS_HORARIO);
+  const [mensagemWhatsapp, setMensagemWhatsapp] = useState(DEFAULT_MENSAGEM_WHATSAPP);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -234,6 +256,7 @@ export default function App() {
           setHorarios(cfg.horarios && cfg.horarios.length > 0 ? cfg.horarios : DEFAULT_HORARIOS);
           setDiasEntrega(cfg.diasEntrega);
           setJanelasHorario(cfg.janelasHorario);
+          setMensagemWhatsapp(cfg.mensagemWhatsapp);
         }
       } catch (e) {
         console.error("Falha ao carregar configurações do Supabase", e);
@@ -253,6 +276,7 @@ export default function App() {
     setHorarios(next.horarios);
     setDiasEntrega(next.diasEntrega);
     setJanelasHorario(next.janelasHorario);
+    setMensagemWhatsapp(next.mensagemWhatsapp);
     try {
       await sbFetch("store_config", {
         method: "POST", accessToken, prefer: "resolution=merge-duplicates,return=minimal",
@@ -377,6 +401,7 @@ export default function App() {
             pedidoMinimo={pedidoMinimo}
             diasEntrega={diasEntrega}
             janelasHorario={janelasHorario}
+            mensagemWhatsapp={mensagemWhatsapp}
             onStockDecremented={(decrements) => {
               setProducts((prev) => prev.map((p) => {
                 const dec = decrements.find((d) => d.id === p.id);
@@ -395,7 +420,7 @@ export default function App() {
           />
         )}
         {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} mensagemWhatsapp={mensagemWhatsapp} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
@@ -704,7 +729,7 @@ function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, se
 }
 
 // ============================================================
-function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, diasEntrega, janelasHorario, onStockDecremented }) {
+function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, diasEntrega, janelasHorario, mensagemWhatsapp, onStockDecremented }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
@@ -738,28 +763,26 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
   const buildMessage = () => {
     const linhas = cartItems.map((i) => `- ${i.qty}x ${i.name} (${brl(i.price)}) = ${brl(i.qty * i.price)}`).join("\n");
-    return [
-      `PEDIDO — ${BRAND_NAME.toUpperCase()}`,
-      `${loteAtual}`,
-      "",
-      "ITENS:",
-      linhas,
-      "",
-      `SUBTOTAL: ${brl(cartTotal)}`,
-      ...(entrega === "entrega" ? [`FRETE${zonaSelecionada ? "" : " (a combinar)"}: ${zonaSelecionada ? brl(frete) : "-"}`] : []),
-      `TOTAL: ${brl(total)}${entrega === "entrega" && !zonaSelecionada ? " + frete a combinar" : ""}`,
-      "",
-      `CLIENTE: ${nome}`,
-      `TELEFONE: ${telefone}`,
-      `E-MAIL: ${email}`,
-      `ENTREGA: ${entrega === "entrega" ? "Entrega no endereço" : "Retirada"}`,
-      ...(entrega === "entrega" ? [`ENDEREÇO: ${endereco}${bairro ? " — " + bairro : ""}`] : []),
-      `DIA/HORÁRIO: ${dataHorarioFinal}`,
-      `PAGAMENTO: ${pagamento === "pix" ? "PIX" : "Cartão de crédito"}`,
-      `NOVIDADES: ${aceitaNovidades ? "aceita receber lançamentos e promoções" : "não quer receber novidades"}`,
-      "",
-      "Aguardo confirmação e envio do pagamento.",
-    ].join("\n");
+    const freteLinha = entrega === "entrega" && zonaSelecionada ? `FRETE: ${brl(frete)}` : "";
+    const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${endereco}${bairro ? " — " + bairro : ""}` : "";
+    const tokens = {
+      marca: BRAND_NAME.toUpperCase(),
+      lote: loteAtual,
+      itens: linhas,
+      subtotal: brl(cartTotal),
+      frete_linha: freteLinha,
+      total: brl(total),
+      cliente: nome,
+      telefone: telefone,
+      email: email,
+      entrega_tipo: entrega === "entrega" ? "Entrega no endereço" : "Retirada",
+      endereco_linha: enderecoLinha,
+      dia_horario: dataHorarioFinal,
+      pagamento: pagamento === "pix" ? "PIX" : "Cartão de crédito",
+    };
+    const template = mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP;
+    const preenchida = template.replace(/\{(\w+)\}/g, (match, key) => (key in tokens ? tokens[key] : match));
+    return preenchida.replace(/\n{3,}/g, "\n\n").trim();
   };
 
   const salvarPedido = async () => {
@@ -874,7 +897,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
               </label>
             )}
             {bairro && zonaSelecionada && (
-              <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>frete estimado para {bairro}: {brl(frete)} — confirmamos o valor exato com você pelo WhatsApp.</p>
+              <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>frete para {bairro}: {brl(frete)}</p>
             )}
             <label style={labelStyle}>Endereço completo
               <textarea style={{ ...inputStyle, minHeight: 64, resize: "vertical" }} value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="rua, número, complemento, ponto de referência" />
@@ -983,12 +1006,13 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [subtitleDraft, setSubtitleDraft] = useState(heroSubtitle);
   const [loteDraft, setLoteDraft] = useState(loteAtual);
   const [whatsappDraft, setWhatsappDraft] = useState(whatsappNumber);
+  const [mensagemDraft, setMensagemDraft] = useState(mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP);
   const [zonesDraft, setZonesDraft] = useState(deliveryZones && deliveryZones.length > 0 ? [...deliveryZones] : []);
   const [minimoDraft, setMinimoDraft] = useState(pedidoMinimo || 0);
   const [mostrarEstoqueDraft, setMostrarEstoqueDraft] = useState(mostrarEstoque === true);
@@ -1016,6 +1040,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       mostrarEstoque: mostrarEstoqueDraft,
       lojaAberta: lojaAbertaDraft, horarios: horariosDraft,
       diasEntrega: diasDraft.filter((d) => d.trim()), janelasHorario: janelasDraft.filter((j) => j.trim()),
+      mensagemWhatsapp: mensagemDraft,
     });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 1800);
@@ -1164,7 +1189,24 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
         </label>
         <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>só números: 55 + DDD + número. Ex: 5531999999999</p>
-        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>Frete por bairro (preço médio do Uber/99 pra cada região)
+
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 14 }}>Mensagem enviada pro WhatsApp
+          <textarea
+            style={{ ...inputStyleTop, minHeight: 220, resize: "vertical", fontFamily: "'Courier Prime', monospace", fontSize: 12.5, lineHeight: 1.6 }}
+            value={mensagemDraft}
+            onChange={(e) => setMensagemDraft(e.target.value)}
+          />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, textTransform: "none", lineHeight: 1.6 }}>
+          use estes marcadores, eles são substituídos automaticamente: <br />
+          {"{marca} {lote} {itens} {subtotal} {frete_linha} {total} {cliente} {telefone} {email} {entrega_tipo} {endereco_linha} {dia_horario} {pagamento}"}
+        </p>
+        <button onClick={() => setMensagemDraft(DEFAULT_MENSAGEM_WHATSAPP)} style={{
+          marginTop: 6, background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
+          borderRadius: 4, padding: "6px 12px", fontSize: 11, textTransform: "uppercase"
+        }}>restaurar mensagem padrão</button>
+
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 14 }}>Frete por bairro (preço médio do Uber/99 pra cada região)
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
             {zonesDraft.map((z, i) => (
               <div key={i} className="flex gap-2" style={{ alignItems: "center" }}>
