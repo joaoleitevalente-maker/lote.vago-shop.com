@@ -1598,6 +1598,14 @@ function OrdersPanel({ accessToken }) {
   const [orders, setOrders] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  // Estados dos Filtros e Ordenação
+  const [buscaTermo, setBuscaTermo] = useState("");
+  const [filtroPagamento, setFiltroPagamento] = useState("todos");
+  const [filtroEnviado, setFiltroEnviado] = useState("todos");
+  const [filtroDataEntrega, setFiltroDataEntrega] = useState("");
+  const [filtroDataCriacao, setFiltroDataCriacao] = useState("");
+  const [ordenacao, setOrdenacao] = useState("recente");
+
   const carregarPedidos = async () => {
     try {
       const rows = await sbFetch("orders?select=*&order=created_at.desc&limit=300", { accessToken });
@@ -1613,6 +1621,148 @@ function OrdersPanel({ accessToken }) {
       setOrders([]);
     }
   };
+
+  useEffect(() => { carregarPedidos(); }, [accessToken]);
+
+  const toggleCampo = async (id, campo, valorAtual) => {
+    setBusyId(id);
+    try {
+      await sbFetch(`orders?id=eq.${id}`, { method: "PATCH", accessToken, prefer: "return=minimal", body: { [campo]: !valorAtual } });
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [campo === "pago" ? "pago" : "enviado"]: !valorAtual } : o)));
+    } catch (e) {
+      console.error(`Falha ao atualizar ${campo} do pedido`, e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const excluirPedido = async (id) => {
+    if (!confirm("Excluir este pedido do histórico? Não dá pra desfazer.")) return;
+    setBusyId(id);
+    try {
+      await sbFetch(`orders?id=eq.${id}`, { method: "DELETE", accessToken, prefer: "return=minimal" });
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+    } catch (e) {
+      console.error("Falha ao excluir pedido", e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (orders === null) return <p style={{ fontSize: 13, color: C.inkFaint }}>carregando pedidos…</p>;
+  if (orders.length === 0) return (
+    <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
+      nenhum pedido registrado ainda.
+    </div>
+  );
+
+  const pedidosFiltrados = orders.filter((o) => {
+    if (buscaTermo.trim()) {
+      const termo = buscaTermo.toLowerCase();
+      const matchNome = (o.nome || "").toLowerCase().includes(termo);
+      const matchEmail = (o.email || "").toLowerCase().includes(termo);
+      const matchTel = (o.telefone || "").toLowerCase().includes(termo);
+      if (!matchNome && !matchEmail && !matchTel) return false;
+    }
+    if (filtroPagamento === "pagos" && !o.pago) return false;
+    if (filtroPagamento === "pendentes" && o.pago) return false;
+    if (filtroEnviado === "enviados" && !o.enviado) return false;
+    if (filtroEnviado === "nao_enviados" && o.enviado) return false;
+    if (filtroDataCriacao) {
+      const dataPedidoStr = (o.data || "").split("T")[0];
+      if (dataPedidoStr !== filtroDataCriacao) return false;
+    }
+    if (filtroDataEntrega) {
+      if (!o.dataHorario || !o.dataHorario.includes(filtroDataEntrega)) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const tA = new Date(a.data).getTime();
+    const tB = new Date(b.data).getTime();
+    return ordenacao === "recente" ? tB - tA : tA - tB;
+  });
+
+  const inputFilterStyle = { background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: "8px 10px", color: C.ink, fontSize: 12, width: "100%" };
+  const labelFilterStyle = { fontSize: 10, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 3, display: "block" };
+
+  return (
+    <div>
+      <div style={{ background: C.white, border: `1px solid ${C.kraftLine}`, borderRadius: 4, padding: 14, marginBottom: 16 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10, color: C.inkSoft }}>Filtros de Pedidos</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <label style={labelFilterStyle}>Buscar cliente</label>
+            <input style={inputFilterStyle} value={buscaTermo} onChange={(e) => setBuscaTermo(e.target.value)} placeholder="Nome, e-mail ou tel" />
+          </div>
+          <div>
+            <label style={labelFilterStyle}>Status de Pagamento</label>
+            <select style={inputFilterStyle} value={filtroPagamento} onChange={(e) => setFiltroPagamento(e.target.value)}>
+              <option value="todos">Todos</option>
+              <option value="pagos">Pagos</option>
+              <option value="pendentes">Pendentes (Não Pagos)</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelFilterStyle}>Status de Envio</label>
+            <select style={inputFilterStyle} value={filtroEnviado} onChange={(e) => setFiltroEnviado(e.target.value)}>
+              <option value="todos">Todos</option>
+              <option value="enviados">Enviados</option>
+              <option value="nao_enviados">Não Enviados</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelFilterStyle}>Data de Criação</label>
+            <input type="date" style={inputFilterStyle} value={filtroDataCriacao} onChange={(e) => setFiltroDataCriacao(e.target.value)} />
+          </div>
+          <div>
+            <label style={labelFilterStyle}>Data de Entrega/Retirada</label>
+            <input type="date" style={inputFilterStyle} value={filtroDataEntrega} onChange={(e) => setFiltroDataEntrega(e.target.value)} />
+          </div>
+          <div>
+            <label style={labelFilterStyle}>Ordenação</label>
+            <select style={inputFilterStyle} value={ordenacao} onChange={(e) => setOrdenacao(e.target.value)}>
+              <option value="recente">Mais novo primeiro</option>
+              <option value="antigo">Mais antigo primeiro</option>
+            </select>
+          </div>
+        </div>
+        {(buscaTermo || filtroPagamento !== "todos" || filtroEnviado !== "todos" || filtroDataCriacao || filtroDataEntrega) && (
+          <button onClick={() => { setBuscaTermo(""); setFiltroPagamento("todos"); setFiltroEnviado("todos"); setFiltroDataCriacao(""); setFiltroDataEntrega(""); }} style={{ marginTop: 10, background: "none", border: "none", color: C.red, fontSize: 11, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Limpar filtros</button>
+        )}
+      </div>
+
+      {pedidosFiltrados.length === 0 ? (
+        <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 24, textAlign: "center", color: C.inkFaint, fontSize: 12.5 }}>nenhum pedido encontrado.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {pedidosFiltrados.map((o) => (
+            <div key={o.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 14, opacity: busyId === o.id ? 0.6 : 1 }}>
+              <div className="flex items-center justify-between">
+                <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{o.nome}</p>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>{brl(o.total || o.subtotal)}</span>
+              </div>
+              <p style={{ fontSize: 11, color: C.inkFaint, marginTop: 2 }}>{new Date(o.data).toLocaleString("pt-BR")} · {o.lote}</p>
+              <div style={{ marginTop: 8, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 8, fontSize: 12, color: C.inkSoft, lineHeight: 1.6 }}>
+                {o.itens.map((i, idx) => <div key={idx}>{i.qty}x {i.name}</div>)}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: C.inkFaint, lineHeight: 1.6 }}>
+                <div>{o.telefone} · {o.email}</div>
+                <div>{o.entrega === "entrega" ? `entrega — ${o.endereco}${o.frete ? ` (frete ${brl(o.frete)})` : ""}` : "retirada"}</div>
+                <div>dia/horário: {o.dataHorario}</div>
+                <div>pagamento: {o.pagamento === "pix" ? "PIX" : "cartão"}</div>
+              </div>
+              <div className="flex items-center gap-2" style={{ marginTop: 12, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 10, flexWrap: "wrap" }}>
+                <button disabled={busyId === o.id} onClick={() => toggleCampo(o.id, "pago", o.pago)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11, textTransform: "uppercase", fontWeight: 700, background: o.pago ? C.cold : C.paper, color: o.pago ? C.white : C.inkSoft, border: `1px solid ${o.pago ? C.cold : C.line}` }}><Check size={12} /> {o.pago ? "pago" : "marcar pago"}</button>
+                <button disabled={busyId === o.id} onClick={() => toggleCampo(o.id, "enviado", o.enviado)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11, textTransform: "uppercase", fontWeight: 700, background: o.enviado ? C.ink : C.paper, color: o.enviado ? C.paper : C.inkSoft, border: `1px solid ${o.enviado ? C.ink : C.line}` }}><Truck size={12} /> {o.enviado ? "enviado" : "marcar enviado"}</button>
+                <button disabled={busyId === o.id} onClick={() => excluirPedido(o.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11, textTransform: "uppercase", fontWeight: 700, background: "none", color: C.red, border: `1px solid ${C.red}`, marginLeft: "auto" }}><Trash2 size={12} /> excluir</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
   useEffect(() => { carregarPedidos(); }, [accessToken]);
 
