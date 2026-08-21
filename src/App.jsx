@@ -988,12 +988,32 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
         <div>
           <span style={labelStyle}>{entrega === "entrega" ? "Melhor dia e horário para receber (alguém precisa estar em casa)" : "Melhor dia e horário para retirar"}</span>
-          {usaSelecaoEstruturada ? (
+{usaSelecaoEstruturada ? (
             <div className="flex gap-2" style={{ marginTop: 6 }}>
-              <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={diaEntrega} onChange={(e) => setDiaEntrega(e.target.value)}>
-                <option value="">dia…</option>
-                {dias.map((d) => <option key={d} value={d}>{formatDataBR(d)}</option>)}
-              </select>
+              <input 
+                type="date" 
+                style={{ ...inputStyle, marginTop: 0, flex: 1 }} 
+                value={diaEntrega} 
+                min={new Date().toISOString().split("T")[0]} 
+                onChange={(e) => {
+                  const dataStr = e.target.value;
+                  if (!dataStr) {
+                    setDiaEntrega("");
+                    return;
+                  }
+                  const [y, m, d] = dataStr.split("-").map(Number);
+                  const dataObj = new Date(y, m - 1, d);
+                  const diasSemana = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+                  const diaNome = diasSemana[dataObj.getDay()];
+
+                  if (dias.length > 0 && !dias.some(dPermitido => dPermitido.includes(diaNome))) {
+                    alert(`Não temos atendimento para ${diaNome}. Escolha um destes dias: ${dias.join(", ")}`);
+                    setDiaEntrega("");
+                    return;
+                  }
+                  setDiaEntrega(dataStr);
+                }} 
+              />
               <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={horarioEntrega} onChange={(e) => setHorarioEntrega(e.target.value)}>
                 <option value="">horário…</option>
                 {janelas.map((j) => <option key={j} value={j}>{j}</option>)}
@@ -1244,23 +1264,39 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           ))}
         </div>
 
-        <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Datas disponíveis para entrega/retirada</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {diasDraft.map((d, i) => (
-            <div key={d} className="flex gap-2 items-center" style={{ justifyContent: "space-between", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "8px 10px" }}>
-              <span style={{ fontSize: 12.5, color: C.ink, textTransform: "capitalize" }}>{formatDataBR(d)}</span>
-              <button onClick={() => removeDia(i)} style={{ background: "none", border: "none", color: C.red, flexShrink: 0 }}><X size={16} /></button>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <input type="date" style={{ ...inputStyleTop, marginTop: 0, flex: 1 }} value={novoDiaDraft} onChange={(e) => setNovoDiaDraft(e.target.value)} />
-            <button onClick={addDiaData} style={{
-              background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
-              borderRadius: 4, padding: "6px 12px", fontSize: 11.5, display: "flex", alignItems: "center", gap: 5, textTransform: "uppercase", flexShrink: 0
-            }}><Plus size={12} /> Adicionar</button>
-          </div>
+       <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Dias da semana para entrega/retirada</p>
+        <div className="flex gap-2" style={{ flexWrap: "wrap" }}>
+          {WEEKDAYS.map((diaNome) => {
+            const selecionado = diasDraft.some(d => d.includes(diaNome));
+            return (
+              <button
+                key={diaNome}
+                type="button"
+                onClick={() => {
+                  const next = selecionado
+                    ? diasDraft.filter((d) => !d.includes(diaNome))
+                    : [...diasDraft, diaNome];
+                  setDiasDraft(next);
+                }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 4,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  background: selecionado ? C.ink : C.paper,
+                  color: selecionado ? C.paper : C.inkSoft,
+                  border: `1px solid ${selecionado ? C.ink : C.line}`,
+                }}
+              >
+                {diaNome}
+              </button>
+            );
+          })}
         </div>
-        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>escolhe as datas do calendário — evita confusão de "quinta" ser qual quinta.</p>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>
+          Marque os dias da semana em que há entregas. O calendário do checkout só aceitará datas que caírem nesses dias.
+        </p>
 
         <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Janelas de horário (blocos de ~2h)</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
