@@ -631,14 +631,17 @@ function ProductCard({ product, qty, onAdd, loteAtual, mostrarEstoque }) {
   const soldOut = product.stock <= 0;
   const atLimit = qty >= product.stock;
   return (
-    <div className="fade-up" style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden", opacity: soldOut ? 0.75 : 1 }}>
+    <div className="fade-up" style={{ 
+      background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden", 
+      opacity: soldOut ? 0.75 : 1, display: "flex", flexDirection: "column", height: "100%" 
+    }}>
       <ProductImage product={product} loteAtual={loteAtual} />
-      <div style={{ padding: "14px 16px", borderTop: `1px dashed ${C.kraftLine}` }}>
+      <div style={{ padding: "14px 16px", borderTop: `1px dashed ${C.kraftLine}`, display: "flex", flexDirection: "column", flex: 1 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>{product.name}</h3>
-        <p style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.5, marginTop: 4, minHeight: 32 }}>
+        <p style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.5, marginTop: 4, flex: 1 }}>
           <span style={{ color: C.inkSoft }}>{product.desc}</span>
         </p>
-        <div className="flex items-center justify-between" style={{ marginTop: 12 }}>
+        <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
           <span style={{ fontSize: 15, fontWeight: 700 }}>{brl(product.price)}</span>
           {!soldOut && (
             qty > 0 ? (
