@@ -1121,8 +1121,9 @@ function AdminLogin({ email, setEmail, password, setPassword, error, loading, on
   );
 }
 
-function emptyProduct(loteAtual) {
-  return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
+function emptyProduct(loteAtual, categoriasDisponiveis) {
+  const primeiraCat = categoriasDisponiveis && categoriasDisponiveis.length > 0 ? categoriasDisponiveis[0] : "Congelados";
+  return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: primeiraCat, lote: loteAtual, active: true, images: [], tags: [] };
 }
 
 function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, categories, saveConfig, accessToken, onLogout }) {  const [categoriesDraft, setCategoriesDraft] = useState(categories && categories.length > 0 ? [...categories] : ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"]);
@@ -1486,9 +1487,11 @@ const submitConfig = () => {
               <input style={inputStyle} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             </label>
             <label style={labelStyle}>Categoria
-              <select style={inputStyle} value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value })}>
-                {Object.keys(CATEGORY_TINT).map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+             <select style={inputStyle} value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value })}>
+  {categoriesDraft.filter((c) => c.trim()).map((c) => (
+    <option key={c} value={c}>{c}</option>
+  ))}
+</select>
             </label>
             <label style={labelStyle}>Lote deste item
               <input style={inputStyle} value={editing.lote || ""} onChange={(e) => setEditing({ ...editing, lote: e.target.value })} placeholder="Lote 01" />
