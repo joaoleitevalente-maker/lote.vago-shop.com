@@ -93,6 +93,7 @@ function mapDbConfig(row) {
     infinitepayHandle: row.infinitepay_handle || "",
     entregaAtiva: row.entrega_ativa !== false,
     retiradaAtiva: row.retirada_ativa !== false,
+    categories: row.categories && row.categories.length > 0 ? row.categories : ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"],
   };
 }
 function toDbConfig(c) {
@@ -106,6 +107,7 @@ function toDbConfig(c) {
     infinitepay_handle: c.infinitepayHandle || "",
     entrega_ativa: c.entregaAtiva !== false,
     retirada_ativa: c.retiradaAtiva !== false,
+    categories: c.categories || ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"],
   };
 }
 const DEFAULT_MENSAGEM_WHATSAPP = `PEDIDO — VAGO
@@ -252,6 +254,7 @@ export default function App() {
   const [infinitepayHandle, setInfinitepayHandle] = useState("");
   const [entregaAtiva, setEntregaAtiva] = useState(true);
   const [retiradaAtiva, setRetiradaAtiva] = useState(true);
+  const [categories, setCategories] = useState(["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"]);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -292,6 +295,7 @@ export default function App() {
           setInfinitepayHandle(cfg.infinitepayHandle);
           setEntregaAtiva(cfg.entregaAtiva);
           setRetiradaAtiva(cfg.retiradaAtiva);
+          setCategories(cfg.categories && cfg.categories.length > 0 ? cfg.categories : ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"]);
         }
       } catch (e) {
         console.error("Falha ao carregar configurações do Supabase", e);
@@ -315,6 +319,7 @@ export default function App() {
     setInfinitepayHandle(next.infinitepayHandle);
     setEntregaAtiva(next.entregaAtiva);
     setRetiradaAtiva(next.retiradaAtiva);
+    setCategories(next.categories); // <--- Adicione esta linha aqui
     try {
       await sbFetch("store_config", {
         method: "POST", accessToken, prefer: "resolution=merge-duplicates,return=minimal",
@@ -461,8 +466,8 @@ export default function App() {
             onSubmit={login}
           />
         )}
-        {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} mensagemWhatsapp={mensagemWhatsapp} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+{view === "admin" && accessToken && (
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} mensagemWhatsapp={mensagemWhatsapp} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
@@ -1120,7 +1125,7 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, categories, saveConfig, accessToken, onLogout }) {  const [categoriesDraft, setCategoriesDraft] = useState(categories && categories.length > 0 ? [...categories] : ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"]);
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [subtitleDraft, setSubtitleDraft] = useState(heroSubtitle);
@@ -1151,7 +1156,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   const inputStyleTop = { width: "100%", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "9px 11px", color: C.ink, fontSize: 13, marginTop: 5 };
   const labelStyleTop = { fontSize: 10.5, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.03em" };
 
-  const submitConfig = () => {
+const submitConfig = () => {
     saveConfig({
       heroTitle: titleDraft, heroSubtitle: subtitleDraft, loteAtual: loteDraft, whatsappNumber: whatsappDraft,
       deliveryZones: zonesDraft.filter((z) => z.bairro.trim()), pedidoMinimo: Number(minimoDraft) || 0,
@@ -1162,6 +1167,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       infinitepayHandle: infinitepayDraft.trim(),
       entregaAtiva: entregaAtivaDraft,
       retiradaAtiva: retiradaAtivaDraft,
+      categories: categoriesDraft.filter((c) => c.trim()), // <--- Adicione esta linha
     });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 1800);
@@ -1339,6 +1345,47 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
         </label>
         <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>só números: 55 + DDD + número. Ex: 5531999999999</p>
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>WhatsApp para receber pedidos
+          <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>só números: 55 + DDD + número. Ex: 5531999999999</p>
+
+        {/* --- COLE O BLOCO DE CATEGORIAS EXATAMENTE AQUI --- */}
+        <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Gerenciar Categorias</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {categoriesDraft.map((cat, i) => (
+            <div key={i} className="flex gap-2" style={{ alignItems: "center" }}>
+              <input 
+                style={{ ...inputStyleTop, marginTop: 0, flex: 1 }} 
+                value={cat} 
+                onChange={(e) => {
+                  const next = [...categoriesDraft];
+                  next[i] = e.target.value;
+                  setCategoriesDraft(next);
+                }} 
+              />
+              <button 
+                onClick={() => setCategoriesDraft(categoriesDraft.filter((_, idx) => idx !== i))} 
+                style={{ background: "none", border: "none", color: C.red, flexShrink: 0 }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+          <button 
+            onClick={() => setCategoriesDraft([...categoriesDraft, ""])} 
+            style={{
+              alignSelf: "flex-start", background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
+              borderRadius: 4, padding: "6px 12px", fontSize: 11.5, display: "flex", alignItems: "center", gap: 5, textTransform: "uppercase"
+            }}
+          >
+            <Plus size={12} /> Adicionar categoria
+          </button>
+        </div>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, marginBottom: 14 }}>
+          Defina os nomes das categorias que aparecerão para classificar os produtos.
+        </p>
+        {/* -------------------------------------------------- */}
 
         <label style={{ ...labelStyleTop, display: "block", marginTop: 14 }}>Mensagem enviada pro WhatsApp
           <textarea
