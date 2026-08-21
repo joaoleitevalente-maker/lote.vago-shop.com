@@ -1598,13 +1598,6 @@ function OrdersPanel({ accessToken }) {
   const [orders, setOrders] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
-  const [buscaTermo, setBuscaTermo] = useState("");
-  const [filtroPagamento, setFiltroPagamento] = useState("todos");
-  const [filtroEnviado, setFiltroEnviado] = useState("todos");
-  const [filtroDataEntrega, setFiltroDataEntrega] = useState("");
-  const [filtroDataCriacao, setFiltroDataCriacao] = useState("");
-  const [ordenacao, setOrdenacao] = useState("recente");
-
   const carregarPedidos = async () => {
     try {
       const rows = await sbFetch("orders?select=*&order=created_at.desc&limit=300", { accessToken });
@@ -1616,7 +1609,7 @@ function OrdersPanel({ accessToken }) {
         pago: !!o.pago, enviado: !!o.enviado,
       })));
     } catch (e) {
-      console.error("Falha ao carregar pedidos", e);
+      console.error("Falha ao carregar pedidos do Supabase", e);
       setOrders([]);
     }
   };
@@ -1627,84 +1620,94 @@ function OrdersPanel({ accessToken }) {
     setBusyId(id);
     try {
       await sbFetch(`orders?id=eq.${id}`, { method: "PATCH", accessToken, prefer: "return=minimal", body: { [campo]: !valorAtual } });
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [campo]: !valorAtual } : o)));
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [campo === "pago" ? "pago" : "enviado"]: !valorAtual } : o)));
     } catch (e) {
-      console.error(`Falha ao atualizar ${campo}`, e);
+      console.error(`Falha ao atualizar ${campo} do pedido`, e);
     } finally {
       setBusyId(null);
     }
   };
 
   const excluirPedido = async (id) => {
-    if (!confirm("Excluir este pedido?")) return;
+    if (!confirm("Excluir este pedido do histórico? Não dá pra desfazer.")) return;
     setBusyId(id);
     try {
       await sbFetch(`orders?id=eq.${id}`, { method: "DELETE", accessToken, prefer: "return=minimal" });
       setOrders((prev) => prev.filter((o) => o.id !== id));
     } catch (e) {
-      console.error("Falha ao excluir", e);
+      console.error("Falha ao excluir pedido", e);
     } finally {
       setBusyId(null);
     }
   };
 
-  if (orders === null) return <p style={{ fontSize: 13, color: "#999" }}>carregando pedidos…</p>;
-
-  const pedidosFiltrados = orders.filter((o) => {
-    if (buscaTermo.trim()) {
-      const termo = buscaTermo.toLowerCase();
-      if (!(o.nome || "").toLowerCase().includes(termo) && !(o.email || "").toLowerCase().includes(termo) && !(o.telefone || "").toLowerCase().includes(termo)) return false;
-    }
-    if (filtroPagamento === "pagos" && !o.pago) return false;
-    if (filtroPagamento === "pendentes" && o.pago) return false;
-    if (filtroEnviado === "enviados" && !o.enviado) return false;
-    if (filtroEnviado === "nao_enviados" && o.enviado) return false;
-    if (filtroDataCriacao && (o.data || "").split("T")[0] !== filtroDataCriacao) return false;
-    if (filtroDataEntrega && (!o.dataHorario || !o.dataHorario.includes(filtroDataEntrega))) return false;
-    return true;
-  }).sort((a, b) => {
-    const tA = new Date(a.data).getTime();
-    const tB = new Date(b.data).getTime();
-    return ordenacao === "recente" ? tB - tA : tA - tB;
-  });
+  if (orders === null) return <p style={{ fontSize: 13, color: C.inkFaint }}>carregando pedidos…</p>;
+  if (orders.length === 0) return (
+    <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
+      nenhum pedido registrado ainda.
+    </div>
+  );
 
   return (
-    <div>
-      <div style={{ background: "#fff", border: "1px solid #eee", borderRadius: 4, padding: 14, marginBottom: 16 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>Filtros</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-          <input style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4 }} value={buscaTermo} onChange={(e) => setBuscaTermo(e.target.value)} placeholder="Buscar cliente..." />
-          <select style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4 }} value={filtroPagamento} onChange={(e) => setFiltroPagamento(e.target.value)}>
-            <option value="todos">Pagamento: Todos</option>
-            <option value="pagos">Pagos</option>
-            <option value="pendentes">Pendentes</option>
-          </select>
-          <select style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4 }} value={filtroEnviado} onChange={(e) => setFiltroEnviado(e.target.value)}>
-            <option value="todos">Envio: Todos</option>
-            <option value="enviados">Enviados</option>
-            <option value="nao_enviados">Não Enviados</option>
-          </select>
-          <input type="date" style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4 }} value={filtroDataCriacao} onChange={(e) => setFiltroDataCriacao(e.target.value)} />
-          <input type="date" style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4 }} value={filtroDataEntrega} onChange={(e) => setFiltroDataEntrega(e.target.value)} />
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {pedidosFiltrados.map((o) => (
-          <div key={o.id} style={{ background: "#fff", border: "1px solid #eee", borderRadius: 4, padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontWeight: 700 }}>{o.nome}</span>
-              <span>{typeof brl === 'function' ? brl(o.total || o.subtotal) : (o.total || o.subtotal)}</span>
-            </div>
-            <p style={{ fontSize: 11, color: "#666" }}>{o.dataHorario} · {o.telefone}</p>
-            <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
-              <button onClick={() => toggleCampo(o.id, "pago", o.pago)} style={{ padding: "5px 10px", borderRadius: 4, background: o.pago ? "#4caf50" : "#eee" }}>{o.pago ? "Pago" : "Marcar Pago"}</button>
-              <button onClick={() => toggleCampo(o.id, "enviado", o.enviado)} style={{ padding: "5px 10px", borderRadius: 4, background: o.enviado ? "#333" : "#eee" }}>{o.enviado ? "Enviado" : "Marcar Enviado"}</button>
-              <button onClick={() => excluirPedido(o.id)} style={{ padding: "5px 10px", borderRadius: 4, background: "#ffcccb" }}>Excluir</button>
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {orders.map((o) => (
+        <div key={o.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 14, opacity: busyId === o.id ? 0.6 : 1 }}>
+          <div className="flex items-center justify-between">
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{o.nome}</p>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>{brl(o.total || o.subtotal)}</span>
           </div>
-        ))}
-      </div>
+          <p style={{ fontSize: 11, color: C.inkFaint, marginTop: 2 }}>
+            {new Date(o.data).toLocaleString("pt-BR")} · {o.lote}
+          </p>
+          <div style={{ marginTop: 8, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 8, fontSize: 12, color: C.inkSoft, lineHeight: 1.6 }}>
+            {o.itens.map((i, idx) => <div key={idx}>{i.qty}x {i.name}</div>)}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: C.inkFaint, lineHeight: 1.6 }}>
+            <div>{o.telefone} · {o.email}</div>
+            <div>{o.entrega === "entrega" ? `entrega — ${o.endereco}${o.frete ? ` (frete ${brl(o.frete)})` : ""}` : "retirada"}</div>
+            <div>dia/horário: {o.dataHorario}</div>
+            <div>pagamento: {o.pagamento === "pix" ? "PIX" : "cartão"} {o.aceitaNovidades ? "· aceita novidades" : ""}</div>
+          </div>
+
+          <div className="flex items-center gap-2" style={{ marginTop: 12, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 10, flexWrap: "wrap" }}>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => toggleCampo(o.id, "pago", o.pago)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: o.pago ? C.cold : C.paper, color: o.pago ? C.white : C.inkSoft,
+                border: `1px solid ${o.pago ? C.cold : C.line}`,
+              }}
+            >
+              <Check size={12} /> {o.pago ? "pago" : "marcar pago"}
+            </button>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => toggleCampo(o.id, "enviado", o.enviado)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: o.enviado ? C.ink : C.paper, color: o.enviado ? C.paper : C.inkSoft,
+                border: `1px solid ${o.enviado ? C.ink : C.line}`,
+              }}
+            >
+              <Truck size={12} /> {o.enviado ? "enviado" : "marcar enviado"}
+            </button>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => excluirPedido(o.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: "none", color: C.red, border: `1px solid ${C.red}`, marginLeft: "auto"
+              }}
+            >
+              <Trash2 size={12} /> excluir
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
