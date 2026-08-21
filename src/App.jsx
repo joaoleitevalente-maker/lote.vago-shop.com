@@ -1004,19 +1004,6 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
           )}
         </div>
 
-        <div>
-          <span style={labelStyle}>Pagamento</span>
-          <div className="flex gap-2" style={{ marginTop: 6 }}>
-            {[{ v: "pix", label: "PIX" }, { v: "cartao", label: "Cartão de crédito" }].map(({ v, label }) => (
-              <button key={v} onClick={() => setPagamento(v)} style={{
-                flex: 1, padding: "10px", borderRadius: 4, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.03em",
-                background: pagamento === v ? C.cold : C.white,
-                color: pagamento === v ? C.white : C.inkSoft,
-                border: `1px solid ${pagamento === v ? C.cold : C.line}`,
-              }}>{label}</button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <button onClick={finalizar} disabled={!canSubmit || saving} style={{
