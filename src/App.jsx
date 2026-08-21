@@ -56,6 +56,17 @@ async function sbRpc(fn, args, accessToken) {
   return sbFetch(`rpc/${fn}`, { method: "POST", body: args, accessToken });
 }
 
+async function createPaymentLink({ handle, items, orderNsu, redirectUrl }) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/create-payment-link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+    body: JSON.stringify({ handle, items, order_nsu: orderNsu, redirect_url: redirectUrl }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ? JSON.stringify(data.error) : "falha ao gerar link de pagamento");
+  return data; // { url: "..." }
+}
+
 // mapeamento entre o formato do banco (snake_case) e o formato usado no app
 function mapDbProduct(row) {
   return {
@@ -79,6 +90,9 @@ function mapDbConfig(row) {
     lojaAberta: row.loja_aberta !== false, horarios: row.horarios || [],
     diasEntrega: row.dias_entrega || [], janelasHorario: row.janelas_horario || [],
     mensagemWhatsapp: row.mensagem_whatsapp || DEFAULT_MENSAGEM_WHATSAPP,
+    infinitepayHandle: row.infinitepay_handle || "",
+    entregaAtiva: row.entrega_ativa !== false,
+    retiradaAtiva: row.retirada_ativa !== false,
   };
 }
 function toDbConfig(c) {
@@ -89,6 +103,9 @@ function toDbConfig(c) {
     loja_aberta: c.lojaAberta !== false, horarios: c.horarios || [],
     dias_entrega: c.diasEntrega || [], janelas_horario: c.janelasHorario || [],
     mensagem_whatsapp: c.mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP,
+    infinitepay_handle: c.infinitepayHandle || "",
+    entrega_ativa: c.entregaAtiva !== false,
+    retirada_ativa: c.retiradaAtiva !== false,
   };
 }
 const DEFAULT_MENSAGEM_WHATSAPP = `PEDIDO — VAGO
@@ -106,6 +123,7 @@ TELEFONE: {telefone}
 E-MAIL: {email}
 ENTREGA: {entrega_tipo}
 {endereco_linha}
+{bairro_linha}
 DIA/HORÁRIO: {dia_horario}
 PAGAMENTO: {pagamento}
 
@@ -169,6 +187,16 @@ const SEED_PRODUCTS = [
 
 const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function formatDataBR(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const dt = new Date(y, m - 1, d);
+  const diasSemana = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return `${diasSemana[dt.getDay()]}, ${String(d).padStart(2, "0")} ${meses[m - 1]}`;
+}
+
 function isStoreOpenNow(lojaAberta, horarios) {
   if (!lojaAberta) return false;
   if (!horarios || horarios.length === 0) return true;
@@ -208,6 +236,7 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [lastMessage, setLastMessage] = useState("");
+  const [paymentLink, setPaymentLink] = useState(null);
   const [heroTitle, setHeroTitle] = useState(DEFAULT_HERO_TITLE);
   const [heroSubtitle, setHeroSubtitle] = useState(DEFAULT_HERO_SUBTITLE);
   const [loteAtual, setLoteAtual] = useState(DEFAULT_LOTE);
@@ -220,6 +249,9 @@ export default function App() {
   const [diasEntrega, setDiasEntrega] = useState(DEFAULT_DIAS_ENTREGA);
   const [janelasHorario, setJanelasHorario] = useState(DEFAULT_JANELAS_HORARIO);
   const [mensagemWhatsapp, setMensagemWhatsapp] = useState(DEFAULT_MENSAGEM_WHATSAPP);
+  const [infinitepayHandle, setInfinitepayHandle] = useState("");
+  const [entregaAtiva, setEntregaAtiva] = useState(true);
+  const [retiradaAtiva, setRetiradaAtiva] = useState(true);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -257,6 +289,9 @@ export default function App() {
           setDiasEntrega(cfg.diasEntrega);
           setJanelasHorario(cfg.janelasHorario);
           setMensagemWhatsapp(cfg.mensagemWhatsapp);
+          setInfinitepayHandle(cfg.infinitepayHandle);
+          setEntregaAtiva(cfg.entregaAtiva);
+          setRetiradaAtiva(cfg.retiradaAtiva);
         }
       } catch (e) {
         console.error("Falha ao carregar configurações do Supabase", e);
@@ -277,6 +312,9 @@ export default function App() {
     setDiasEntrega(next.diasEntrega);
     setJanelasHorario(next.janelasHorario);
     setMensagemWhatsapp(next.mensagemWhatsapp);
+    setInfinitepayHandle(next.infinitepayHandle);
+    setEntregaAtiva(next.entregaAtiva);
+    setRetiradaAtiva(next.retiradaAtiva);
     try {
       await sbFetch("store_config", {
         method: "POST", accessToken, prefer: "resolution=merge-duplicates,return=minimal",
@@ -402,6 +440,10 @@ export default function App() {
             diasEntrega={diasEntrega}
             janelasHorario={janelasHorario}
             mensagemWhatsapp={mensagemWhatsapp}
+            infinitepayHandle={infinitepayHandle}
+            entregaAtiva={entregaAtiva}
+            retiradaAtiva={retiradaAtiva}
+            setPaymentLink={setPaymentLink}
             onStockDecremented={(decrements) => {
               setProducts((prev) => prev.map((p) => {
                 const dec = decrements.find((d) => d.id === p.id);
@@ -410,7 +452,7 @@ export default function App() {
             }}
           />
         )}
-        {view === "sucesso" && <Sucesso message={lastMessage} setView={setView} />}
+        {view === "sucesso" && <Sucesso message={lastMessage} setView={setView} paymentLink={paymentLink} whatsappNumber={whatsappNumber} />}
         {view === "admin" && !accessToken && (
           <AdminLogin
             email={loginEmail} setEmail={setLoginEmail}
@@ -420,7 +462,7 @@ export default function App() {
           />
         )}
         {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} mensagemWhatsapp={mensagemWhatsapp} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} diasEntrega={diasEntrega} janelasHorario={janelasHorario} mensagemWhatsapp={mensagemWhatsapp} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
@@ -594,7 +636,7 @@ function ProductCard({ product, qty, onAdd, loteAtual, mostrarEstoque }) {
       <div style={{ padding: "14px 16px", borderTop: `1px dashed ${C.kraftLine}` }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>{product.name}</h3>
         <p style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.5, marginTop: 4, minHeight: 32 }}>
-          <span style={{ fontStyle: "italic", color: C.inkFaint }}>sabor: </span>{product.desc}
+          <span style={{ color: C.inkSoft }}>{product.desc}</span>
         </p>
         <div className="flex items-center justify-between" style={{ marginTop: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 700 }}>{brl(product.price)}</span>
@@ -729,12 +771,12 @@ function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, se
 }
 
 // ============================================================
-function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, diasEntrega, janelasHorario, mensagemWhatsapp, onStockDecremented }) {
+function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, diasEntrega, janelasHorario, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, onStockDecremented, setPaymentLink }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [aceitaNovidades, setAceitaNovidades] = useState(false);
-  const [entrega, setEntrega] = useState("entrega");
+  const [entrega, setEntrega] = useState(entregaAtiva ? "entrega" : "retirada");
   const [endereco, setEndereco] = useState("");
   const [bairro, setBairro] = useState("");
   const [diaEntrega, setDiaEntrega] = useState("");
@@ -748,7 +790,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const janelas = janelasHorario || [];
   const usaSelecaoEstruturada = dias.length > 0 && janelas.length > 0;
   const dataHorarioFinal = usaSelecaoEstruturada
-    ? (diaEntrega && horarioEntrega ? `${diaEntrega}, ${horarioEntrega}` : "")
+    ? (diaEntrega && horarioEntrega ? `${formatDataBR(diaEntrega)}, ${horarioEntrega}` : "")
     : dataHorarioLivre;
   const minimo = Number(pedidoMinimo) || 0;
   const bloqueadoPorMinimo = cartTotal < minimo;
@@ -759,12 +801,13 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
   const emailValido = /\S+@\S+\.\S+/.test(email.trim());
   const canSubmit = !bloqueadoPorMinimo && nome.trim() && telefone.trim() && emailValido && dataHorarioFinal.trim() &&
-    (entrega === "retirada" || (endereco.trim() && (zonas.length === 0 || bairro)));
+    (entrega === "retirada" || (endereco.trim() && bairro.trim()));
 
   const buildMessage = () => {
     const linhas = cartItems.map((i) => `- ${i.qty}x ${i.name} (${brl(i.price)}) = ${brl(i.qty * i.price)}`).join("\n");
     const freteLinha = entrega === "entrega" && zonaSelecionada ? `FRETE: ${brl(frete)}` : "";
-    const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${endereco}${bairro ? " — " + bairro : ""}` : "";
+    const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${endereco}` : "";
+    const bairroLinha = entrega === "entrega" ? `BAIRRO: ${bairro}` : "";
     const tokens = {
       marca: BRAND_NAME.toUpperCase(),
       lote: loteAtual,
@@ -777,6 +820,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       email: email,
       entrega_tipo: entrega === "entrega" ? "Entrega no endereço" : "Retirada",
       endereco_linha: enderecoLinha,
+      bairro_linha: bairroLinha,
       dia_horario: dataHorarioFinal,
       pagamento: pagamento === "pix" ? "PIX" : "Cartão de crédito",
     };
@@ -794,9 +838,11 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       subtotal: cartTotal, total,
     };
     try {
-      await sbFetch("orders", { method: "POST", body: pedidoDb, prefer: "return=minimal" });
+      const rows = await sbFetch("orders", { method: "POST", body: pedidoDb, prefer: "return=representation" });
+      return rows && rows[0] ? rows[0].id : null;
     } catch (e) {
       console.error("Falha ao salvar pedido no Supabase", e);
+      return null;
     }
   };
 
@@ -810,18 +856,43 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
     }
   };
 
+  const gerarPagamento = async (orderId) => {
+    if (!infinitepayHandle || !orderId) return null;
+    const items = cartItems.map((i) => ({ quantity: i.qty, price: Math.round(i.price * 100), description: i.name }));
+    if (frete > 0) items.push({ quantity: 1, price: Math.round(frete * 100), description: "Frete" });
+    try {
+      const data = await createPaymentLink({
+        handle: infinitepayHandle, items, orderNsu: orderId,
+        redirectUrl: window.location.origin,
+      });
+      return data?.url || null;
+    } catch (e) {
+      console.error("Falha ao gerar link de pagamento InfinitePay", e);
+      return null;
+    }
+  };
+
   const finalizar = async () => {
     if (!canSubmit) return;
     setSaving(true);
 
     await darBaixaEstoque();
     onStockDecremented(cartItems.map((i) => ({ id: i.id, qty: i.qty })));
-    await salvarPedido();
+    const orderId = await salvarPedido();
 
     const msg = buildMessage();
     setLastMessage(msg);
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank");
+
+    const link = await gerarPagamento(orderId);
+    setPaymentLink(link);
+
+    if (link) {
+      window.open(link, "_blank");
+    } else {
+      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
+    }
+
     setCart({});
     setSaving(false);
     setView("sucesso");
@@ -871,29 +942,39 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
           usamos seu contato só para confirmar este pedido e, se você aceitar acima, para avisar sobre novos drops. não compartilhamos com terceiros.
         </p>
 
-        <div>
-          <span style={labelStyle}>Como recebe</span>
-          <div className="flex gap-2" style={{ marginTop: 6 }}>
-            {[{ v: "entrega", label: "Entrega", icon: Truck }, { v: "retirada", label: "Retirada", icon: StoreIcon }].map(({ v, label, icon: Icon }) => (
-              <button key={v} onClick={() => setEntrega(v)} style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "10px", borderRadius: 4, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.03em",
-                background: entrega === v ? C.ink : C.white,
-                color: entrega === v ? C.paper : C.inkSoft,
-                border: `1px solid ${entrega === v ? C.ink : C.line}`,
-              }}><Icon size={14} /> {label}</button>
-            ))}
+        {entregaAtiva !== false && retiradaAtiva !== false ? (
+          <div>
+            <span style={labelStyle}>Como recebe</span>
+            <div className="flex gap-2" style={{ marginTop: 6 }}>
+              {[{ v: "entrega", label: "Entrega", icon: Truck }, { v: "retirada", label: "Retirada", icon: StoreIcon }].map(({ v, label, icon: Icon }) => (
+                <button key={v} onClick={() => setEntrega(v)} style={{
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  padding: "10px", borderRadius: 4, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.03em",
+                  background: entrega === v ? C.ink : C.white,
+                  color: entrega === v ? C.paper : C.inkSoft,
+                  border: `1px solid ${entrega === v ? C.ink : C.line}`,
+                }}><Icon size={14} /> {label}</button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <p style={{ fontSize: 11.5, color: C.inkFaint }}>
+            {entregaAtiva !== false ? "Pedido será por entrega." : "Pedido será para retirada."}
+          </p>
+        )}
 
         {entrega === "entrega" && (
           <>
-            {zonas.length > 0 && (
+            {zonas.length > 0 ? (
               <label style={labelStyle}>Bairro
                 <select style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)}>
                   <option value="">selecione…</option>
                   {zonas.map((z) => <option key={z.bairro} value={z.bairro}>{z.bairro} — frete {brl(Number(z.frete))}</option>)}
                 </select>
+              </label>
+            ) : (
+              <label style={labelStyle}>Bairro
+                <input style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="seu bairro" />
               </label>
             )}
             {bairro && zonaSelecionada && (
@@ -911,7 +992,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
             <div className="flex gap-2" style={{ marginTop: 6 }}>
               <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={diaEntrega} onChange={(e) => setDiaEntrega(e.target.value)}>
                 <option value="">dia…</option>
-                {dias.map((d) => <option key={d} value={d}>{d}</option>)}
+                {dias.map((d) => <option key={d} value={d}>{formatDataBR(d)}</option>)}
               </select>
               <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={horarioEntrega} onChange={(e) => setHorarioEntrega(e.target.value)}>
                 <option value="">horário…</option>
@@ -944,21 +1025,41 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
         fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         textTransform: "uppercase", letterSpacing: "0.05em"
       }}>
-        <MessageCircle size={16} /> Enviar pedido pelo WhatsApp
+        <MessageCircle size={16} /> {infinitepayHandle ? "Finalizar e pagar" : "Enviar pedido pelo WhatsApp"}
       </button>
       {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp, e-mail válido, dia/horário{entrega === "entrega" ? ", endereço" : ""}{zonas.length > 0 && entrega === "entrega" ? " e bairro" : ""} para continuar.</p>}
     </div>
   );
 }
 
-function Sucesso({ message, setView }) {
+function Sucesso({ message, setView, paymentLink, whatsappNumber }) {
   return (
     <div style={{ paddingTop: 56, textAlign: "center", maxWidth: 440, margin: "0 auto" }} className="fade-up">
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
         <Stamp size={50} rotate={-4}><Check color={C.white} size={22} /></Stamp>
       </div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Pedido enviado</h2>
-      <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 18 }}>Abrimos o WhatsApp com o pedido pronto. Se não abriu automaticamente, copie a mensagem abaixo.</p>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Pedido registrado</h2>
+
+      {paymentLink ? (
+        <>
+          <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 18 }}>Abrimos a página de pagamento em outra aba. Se não abriu, clica no botão abaixo.</p>
+          <a href={paymentLink} target="_blank" rel="noopener noreferrer" style={{
+            display: "inline-block", background: C.ink, color: C.paper, borderRadius: 4, padding: "13px 24px",
+            fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", textDecoration: "none", marginBottom: 14
+          }}>
+            Pagar agora (PIX ou cartão)
+          </a>
+          <p style={{ color: C.inkFaint, fontSize: 11.5, marginBottom: 18 }}>
+            Prefere confirmar por WhatsApp também?{" "}
+            <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" style={{ color: C.cold }}>
+              enviar resumo
+            </a>
+          </p>
+        </>
+      ) : (
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 18 }}>Abrimos o WhatsApp com o pedido pronto. Se não abriu automaticamente, copie a mensagem abaixo.</p>
+      )}
+
       <pre style={{
         textAlign: "left", background: C.white, border: `1px solid ${C.line}`, borderRadius: 4,
         padding: 14, fontSize: 11.5, whiteSpace: "pre-wrap", color: C.inkSoft, marginBottom: 18
@@ -1006,13 +1107,17 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, diasEntrega, janelasHorario, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [subtitleDraft, setSubtitleDraft] = useState(heroSubtitle);
   const [loteDraft, setLoteDraft] = useState(loteAtual);
   const [whatsappDraft, setWhatsappDraft] = useState(whatsappNumber);
   const [mensagemDraft, setMensagemDraft] = useState(mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP);
+  const [infinitepayDraft, setInfinitepayDraft] = useState(infinitepayHandle || "");
+  const [entregaAtivaDraft, setEntregaAtivaDraft] = useState(entregaAtiva !== false);
+  const [retiradaAtivaDraft, setRetiradaAtivaDraft] = useState(retiradaAtiva !== false);
+  const [novoDiaDraft, setNovoDiaDraft] = useState("");
   const [zonesDraft, setZonesDraft] = useState(deliveryZones && deliveryZones.length > 0 ? [...deliveryZones] : []);
   const [minimoDraft, setMinimoDraft] = useState(pedidoMinimo || 0);
   const [mostrarEstoqueDraft, setMostrarEstoqueDraft] = useState(mostrarEstoque === true);
@@ -1041,6 +1146,9 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       lojaAberta: lojaAbertaDraft, horarios: horariosDraft,
       diasEntrega: diasDraft.filter((d) => d.trim()), janelasHorario: janelasDraft.filter((j) => j.trim()),
       mensagemWhatsapp: mensagemDraft,
+      infinitepayHandle: infinitepayDraft.trim(),
+      entregaAtiva: entregaAtivaDraft,
+      retiradaAtiva: retiradaAtivaDraft,
     });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 1800);
@@ -1055,7 +1163,12 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
     next[i] = value;
     setDiasDraft(next);
   };
-  const addDia = () => setDiasDraft([...diasDraft, ""]);
+  const addDiaData = () => {
+    if (!novoDiaDraft) return;
+    if (diasDraft.includes(novoDiaDraft)) { setNovoDiaDraft(""); return; }
+    setDiasDraft([...diasDraft, novoDiaDraft].sort());
+    setNovoDiaDraft("");
+  };
   const removeDia = (i) => setDiasDraft(diasDraft.filter((_, idx) => idx !== i));
 
   const setJanelaAt = (i, value) => {
@@ -1144,19 +1257,23 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           ))}
         </div>
 
-        <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Dias disponíveis para entrega/retirada</p>
+        <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Datas disponíveis para entrega/retirada</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {diasDraft.map((d, i) => (
-            <div key={i} className="flex gap-2" style={{ alignItems: "center" }}>
-              <input style={{ ...inputStyleTop, marginTop: 0, flex: 1 }} value={d} onChange={(e) => setDiaAt(i, e.target.value)} placeholder="ex: Quinta-feira" />
+            <div key={d} className="flex gap-2 items-center" style={{ justifyContent: "space-between", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "8px 10px" }}>
+              <span style={{ fontSize: 12.5, color: C.ink, textTransform: "capitalize" }}>{formatDataBR(d)}</span>
               <button onClick={() => removeDia(i)} style={{ background: "none", border: "none", color: C.red, flexShrink: 0 }}><X size={16} /></button>
             </div>
           ))}
-          <button onClick={addDia} style={{
-            alignSelf: "flex-start", background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
-            borderRadius: 4, padding: "6px 12px", fontSize: 11.5, display: "flex", alignItems: "center", gap: 5, textTransform: "uppercase"
-          }}><Plus size={12} /> Adicionar dia</button>
+          <div className="flex gap-2">
+            <input type="date" style={{ ...inputStyleTop, marginTop: 0, flex: 1 }} value={novoDiaDraft} onChange={(e) => setNovoDiaDraft(e.target.value)} />
+            <button onClick={addDiaData} style={{
+              background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
+              borderRadius: 4, padding: "6px 12px", fontSize: 11.5, display: "flex", alignItems: "center", gap: 5, textTransform: "uppercase", flexShrink: 0
+            }}><Plus size={12} /> Adicionar</button>
+          </div>
         </div>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>escolhe as datas do calendário — evita confusão de "quinta" ser qual quinta.</p>
 
         <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Janelas de horário (blocos de ~2h)</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1185,6 +1302,10 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
         <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>Texto abaixo do título
           <textarea style={{ ...inputStyleTop, minHeight: 56, resize: "vertical" }} value={subtitleDraft} onChange={(e) => setSubtitleDraft(e.target.value)} />
         </label>
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>InfiniteTag (pagamento automático)
+          <input style={inputStyleTop} value={infinitepayDraft} onChange={(e) => setInfinitepayDraft(e.target.value.replace(/^\$/, "").trim())} placeholder="vagoloja" />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>seu @ do InfinitePay, sem o $. Preenchido = o cliente paga direto (PIX/cartão) ao finalizar. Vazio = volta a enviar só por WhatsApp.</p>
         <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>WhatsApp para receber pedidos
           <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
         </label>
@@ -1205,6 +1326,27 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           marginTop: 6, background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
           borderRadius: 4, padding: "6px 12px", fontSize: 11, textTransform: "uppercase"
         }}>restaurar mensagem padrão</button>
+
+        <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Formas de recebimento</p>
+        <div className="flex flex-wrap gap-4">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={entregaAtivaDraft} onChange={(e) => {
+              const val = e.target.checked;
+              if (!val && !retiradaAtivaDraft) return;
+              setEntregaAtivaDraft(val);
+            }} />
+            <span style={{ fontSize: 12, color: C.inkSoft, textTransform: "none" }}>permitir entrega</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={retiradaAtivaDraft} onChange={(e) => {
+              const val = e.target.checked;
+              if (!val && !entregaAtivaDraft) return;
+              setRetiradaAtivaDraft(val);
+            }} />
+            <span style={{ fontSize: 12, color: C.inkSoft, textTransform: "none" }}>permitir retirada</span>
+          </label>
+        </div>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>pelo menos uma precisa ficar ativa. desative "entrega" pra virar loja só de retirada, por exemplo.</p>
 
         <label style={{ ...labelStyleTop, display: "block", marginTop: 14 }}>Frete por bairro (preço médio do Uber/99 pra cada região)
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
@@ -1375,23 +1517,50 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
 
 function OrdersPanel({ accessToken }) {
   const [orders, setOrders] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const rows = await sbFetch("orders?select=*&order=created_at.desc&limit=300", { accessToken });
-        setOrders((rows || []).map((o) => ({
-          id: o.id, data: o.created_at, lote: o.lote, nome: o.nome, telefone: o.telefone, email: o.email,
-          aceitaNovidades: o.aceita_novidades, entrega: o.entrega, endereco: o.endereco, frete: Number(o.frete) || 0,
-          dataHorario: o.data_horario, pagamento: o.pagamento, itens: o.itens || [],
-          subtotal: Number(o.subtotal) || 0, total: Number(o.total) || 0,
-        })));
-      } catch (e) {
-        console.error("Falha ao carregar pedidos do Supabase", e);
-        setOrders([]);
-      }
-    })();
-  }, [accessToken]);
+  const carregarPedidos = async () => {
+    try {
+      const rows = await sbFetch("orders?select=*&order=created_at.desc&limit=300", { accessToken });
+      setOrders((rows || []).map((o) => ({
+        id: o.id, data: o.created_at, lote: o.lote, nome: o.nome, telefone: o.telefone, email: o.email,
+        aceitaNovidades: o.aceita_novidades, entrega: o.entrega, endereco: o.endereco, frete: Number(o.frete) || 0,
+        dataHorario: o.data_horario, pagamento: o.pagamento, itens: o.itens || [],
+        subtotal: Number(o.subtotal) || 0, total: Number(o.total) || 0,
+        pago: !!o.pago, enviado: !!o.enviado,
+      })));
+    } catch (e) {
+      console.error("Falha ao carregar pedidos do Supabase", e);
+      setOrders([]);
+    }
+  };
+
+  useEffect(() => { carregarPedidos(); }, [accessToken]);
+
+  const toggleCampo = async (id, campo, valorAtual) => {
+    setBusyId(id);
+    try {
+      await sbFetch(`orders?id=eq.${id}`, { method: "PATCH", accessToken, prefer: "return=minimal", body: { [campo]: !valorAtual } });
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [campo === "pago" ? "pago" : "enviado"]: !valorAtual } : o)));
+    } catch (e) {
+      console.error(`Falha ao atualizar ${campo} do pedido`, e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const excluirPedido = async (id) => {
+    if (!confirm("Excluir este pedido do histórico? Não dá pra desfazer.")) return;
+    setBusyId(id);
+    try {
+      await sbFetch(`orders?id=eq.${id}`, { method: "DELETE", accessToken, prefer: "return=minimal" });
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+    } catch (e) {
+      console.error("Falha ao excluir pedido", e);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (orders === null) return <p style={{ fontSize: 13, color: C.inkFaint }}>carregando pedidos…</p>;
   if (orders.length === 0) return (
@@ -1403,7 +1572,7 @@ function OrdersPanel({ accessToken }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {orders.map((o) => (
-        <div key={o.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 14 }}>
+        <div key={o.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 14, opacity: busyId === o.id ? 0.6 : 1 }}>
           <div className="flex items-center justify-between">
             <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{o.nome}</p>
             <span style={{ fontSize: 15, fontWeight: 700 }}>{brl(o.total || o.subtotal)}</span>
@@ -1419,6 +1588,44 @@ function OrdersPanel({ accessToken }) {
             <div>{o.entrega === "entrega" ? `entrega — ${o.endereco}${o.frete ? ` (frete ${brl(o.frete)})` : ""}` : "retirada"}</div>
             <div>dia/horário: {o.dataHorario}</div>
             <div>pagamento: {o.pagamento === "pix" ? "PIX" : "cartão"} {o.aceitaNovidades ? "· aceita novidades" : ""}</div>
+          </div>
+
+          <div className="flex items-center gap-2" style={{ marginTop: 12, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 10, flexWrap: "wrap" }}>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => toggleCampo(o.id, "pago", o.pago)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: o.pago ? C.cold : C.paper, color: o.pago ? C.white : C.inkSoft,
+                border: `1px solid ${o.pago ? C.cold : C.line}`,
+              }}
+            >
+              <Check size={12} /> {o.pago ? "pago" : "marcar pago"}
+            </button>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => toggleCampo(o.id, "enviado", o.enviado)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: o.enviado ? C.ink : C.paper, color: o.enviado ? C.paper : C.inkSoft,
+                border: `1px solid ${o.enviado ? C.ink : C.line}`,
+              }}
+            >
+              <Truck size={12} /> {o.enviado ? "enviado" : "marcar enviado"}
+            </button>
+            <button
+              disabled={busyId === o.id}
+              onClick={() => excluirPedido(o.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                background: "none", color: C.red, border: `1px solid ${C.red}`, marginLeft: "auto"
+              }}
+            >
+              <Trash2 size={12} /> excluir
+            </button>
           </div>
         </div>
       ))}
