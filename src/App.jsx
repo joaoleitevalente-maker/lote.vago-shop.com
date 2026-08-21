@@ -986,22 +986,27 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
           </>
         )}
 
-        <div>
+<div>
           <span style={labelStyle}>{entrega === "entrega" ? "Melhor dia e horário para receber (alguém precisa estar em casa)" : "Melhor dia e horário para retirar"}</span>
-          {usaSelecaoEstruturada ? (
-            <div className="flex gap-2" style={{ marginTop: 6 }}>
-              <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={diaEntrega} onChange={(e) => setDiaEntrega(e.target.value)}>
-                <option value="">dia…</option>
-                {dias.map((d) => <option key={d} value={d}>{formatDataBR(d)}</option>)}
-              </select>
-              <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={horarioEntrega} onChange={(e) => setHorarioEntrega(e.target.value)}>
-                <option value="">horário…</option>
-                {janelas.map((j) => <option key={j} value={j}>{j}</option>)}
-              </select>
-            </div>
-          ) : (
-            <input style={inputStyle} value={dataHorarioLivre} onChange={(e) => setDataHorarioLivre(e.target.value)} placeholder="ex: quinta-feira, à tarde" />
-          )}
+          <div className="flex gap-2" style={{ marginTop: 6 }}>
+            
+            {/* Calendário real nativo do navegador/celular */}
+            <input 
+              type="date" 
+              style={{ ...inputStyle, marginTop: 0, flex: 1 }} 
+              value={diaEntrega} 
+              min={new Date().toISOString().split("T")[0]} 
+              onChange={(e) => setDiaEntrega(e.target.value)} 
+            />
+
+            {/* Janela de horário fixa ao lado */}
+            <select style={{ ...inputStyle, marginTop: 0, flex: 1 }} value={horarioEntrega} onChange={(e) => setHorarioEntrega(e.target.value)}>
+              <option value="">Selecione o horário…</option>
+              {janelas.map((j) => (
+                <option key={j} value={j}>{j}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
       </div>
