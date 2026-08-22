@@ -152,6 +152,7 @@ function mapDbConfig(row) {
     intervaloEntrega: Number(row.intervalo_entrega_horas) || 2,
     retiradaAtiva: row.retirada_ativa !== false,
     categories: (row.categories && row.categories.length > 0) ? row.categories : DEFAULT_CATEGORIES,
+    fretePadraoDesconhecido: Number(row.frete_padrao_desconhecido) || 18,
   };
 }
 function toDbConfig(c) {
@@ -169,6 +170,7 @@ function toDbConfig(c) {
     intervalo_entrega_horas: Number(c.intervaloEntrega) || 2,
     retirada_ativa: c.retiradaAtiva !== false,
     categories: (c.categories && c.categories.length > 0) ? c.categories : DEFAULT_CATEGORIES,
+    frete_padrao_desconhecido: Number(c.fretePadraoDesconhecido) || 18,
   };
 }
 const DEFAULT_CATEGORIES = ["Congelados", "Massas", "Molhos & Manteigas", "Charcutaria", "Doces"];
@@ -340,6 +342,7 @@ export default function App() {
   const [entregaAtiva, setEntregaAtiva] = useState(true);
   const [retiradaAtiva, setRetiradaAtiva] = useState(true);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [fretePadraoDesconhecido, setFretePadraoDesconhecido] = useState(18);
   const [intervaloEntrega, setIntervaloEntrega] = useState(2);
 
   useEffect(() => {
@@ -383,6 +386,7 @@ export default function App() {
           setEntregaAtiva(cfg.entregaAtiva);
           setRetiradaAtiva(cfg.retiradaAtiva);
           setCategories(cfg.categories);
+          setFretePadraoDesconhecido(cfg.fretePadraoDesconhecido);
           setIntervaloEntrega(cfg.intervaloEntrega);
         }
       } catch (e) {
@@ -409,6 +413,7 @@ export default function App() {
     setEntregaAtiva(next.entregaAtiva);
     setRetiradaAtiva(next.retiradaAtiva);
     setCategories(next.categories);
+    setFretePadraoDesconhecido(next.fretePadraoDesconhecido);
     setIntervaloEntrega(next.intervaloEntrega);
     try {
       await sbFetch("store_config", {
@@ -545,6 +550,7 @@ export default function App() {
             mensagemWhatsapp={mensagemWhatsapp}
             infinitepayHandle={infinitepayHandle}
             infinitepayLogoUrl={infinitepayLogoUrl}
+            fretePadraoDesconhecido={fretePadraoDesconhecido}
             entregaAtiva={entregaAtiva}
             retiradaAtiva={retiradaAtiva}
             setPaymentLink={setPaymentLink}
@@ -566,7 +572,7 @@ export default function App() {
           />
         )}
         {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} infinitepayHandle={infinitepayHandle} infinitepayLogoUrl={infinitepayLogoUrl} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} infinitepayHandle={infinitepayHandle} infinitepayLogoUrl={infinitepayLogoUrl} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} fretePadraoDesconhecido={fretePadraoDesconhecido} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
@@ -894,7 +900,7 @@ function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, se
 }
 
 // ============================================================
-function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, onStockDecremented, setPaymentLink }) {
+function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, fretePadraoDesconhecido, onStockDecremented, setPaymentLink }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
@@ -936,9 +942,20 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const bloqueadoPorMinimo = cartTotal < minimo;
 
   const zonaSelecionada = zonas.find((z) => normalizeBairro(z.bairro) === normalizeBairro(bairro));
-  const foraDaCobertura = entrega === "entrega" && zonas.length > 0 && bairro.trim() && !zonaSelecionada;
-  const frete = entrega === "entrega" ? (zonaSelecionada ? Number(zonaSelecionada.frete) : 0) : 0;
+  const bairroDesconhecido = entrega === "entrega" && zonas.length > 0 && bairro.trim() && !zonaSelecionada;
+  const frete = entrega === "entrega"
+    ? (zonaSelecionada ? Number(zonaSelecionada.frete) : (bairroDesconhecido ? Number(fretePadraoDesconhecido) || 18 : 0))
+    : 0;
   const total = cartTotal + frete;
+
+  const registrarBairroDesconhecido = async () => {
+    if (!bairroDesconhecido) return;
+    try {
+      await sbFetch("bairros_desconhecidos", { method: "POST", body: { bairro: bairro.trim() }, prefer: "return=minimal" });
+    } catch (e) {
+      console.error("Falha ao registrar bairro desconhecido", e);
+    }
+  };
 
   const cepValido = cep.replace(/\D/g, "").length === 8;
 
@@ -966,11 +983,13 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const emailValido = isValidEmail(email);
   const telefoneValido = isValidTelefoneBR(telefone);
   const canSubmit = !bloqueadoPorMinimo && nome.trim().length >= 2 && telefoneValido && emailValido && dataHorarioFinal.trim() &&
-    (entrega === "retirada" || (cepValido && rua.trim() && bairro.trim() && numero.trim() && !foraDaCobertura));
+    (entrega === "retirada" || (cepValido && rua.trim() && bairro.trim() && numero.trim()));
 
   const buildMessage = () => {
     const linhas = cartItems.map((i) => `- ${i.qty}x ${i.name} (${brl(i.price)}) = ${brl(i.qty * i.price)}`).join("\n");
-    const freteLinha = entrega === "entrega" && zonaSelecionada ? `FRETE: ${brl(frete)}` : "";
+    const freteLinha = entrega === "entrega"
+      ? (zonaSelecionada ? `FRETE: ${brl(frete)}` : (bairroDesconhecido ? `FRETE: ${brl(frete)} (estimado — bairro fora da lista, confirmar)` : ""))
+      : "";
     const enderecoCompleto = `${rua}, ${numero}${complemento ? " - " + complemento : ""} — CEP ${cep}`;
     const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${enderecoCompleto}` : "";
     const bairroLinha = entrega === "entrega" ? `BAIRRO: ${bairro}` : "";
@@ -1059,6 +1078,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
     await darBaixaEstoque();
     onStockDecremented(cartItems.map((i) => ({ id: i.id, qty: i.qty })));
     const orderId = await salvarPedido();
+    await registrarBairroDesconhecido();
 
     const msg = buildMessage();
     setLastMessage(msg);
@@ -1208,8 +1228,10 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
                 {zonaSelecionada && (
                   <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>frete para {bairro}: {brl(frete)}</p>
                 )}
-                {foraDaCobertura && (
-                  <p style={{ fontSize: 11.5, color: C.red, marginTop: -8 }}>ainda não entregamos em {bairro}. entre em contato pelo WhatsApp pra combinarmos.</p>
+                {bairroDesconhecido && (
+                  <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>
+                    frete estimado pra {bairro}: {brl(frete)} (bairro fora da nossa lista — confirmamos o valor exato com você)
+                  </p>
                 )}
                 <div className="flex gap-2">
                   <label style={{ ...labelStyle, flex: 1 }}>Número
@@ -1365,7 +1387,7 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, fretePadraoDesconhecido, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [categoriesDraft, setCategoriesDraft] = useState(
@@ -1383,6 +1405,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   const [retiradaAtivaDraft, setRetiradaAtivaDraft] = useState(retiradaAtiva !== false);
   const [zonesDraft, setZonesDraft] = useState(deliveryZones && deliveryZones.length > 0 ? [...deliveryZones] : []);
   const [minimoDraft, setMinimoDraft] = useState(pedidoMinimo || 0);
+  const [fretePadraoDraft, setFretePadraoDraft] = useState(fretePadraoDesconhecido || 18);
   const [mostrarEstoqueDraft, setMostrarEstoqueDraft] = useState(mostrarEstoque === true);
   const [lojaAbertaDraft, setLojaAbertaDraft] = useState(lojaAberta !== false);
   const [horariosDraft, setHorariosDraft] = useState(horarios && horarios.length > 0 ? [...horarios] : DEFAULT_HORARIOS);
@@ -1414,6 +1437,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       entregaAtiva: entregaAtivaDraft,
       retiradaAtiva: retiradaAtivaDraft,
       categories: categoriesDraft.filter((c) => c.trim()),
+      fretePadraoDesconhecido: Number(fretePadraoDraft) || 18,
     });
     setConfigSaved(true);
     setTimeout(() => setConfigSaved(false), 1800);
@@ -1686,6 +1710,11 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           </div>
           <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, textTransform: "none" }}>lista vazia = não trava por região, frete fica "a combinar" no WhatsApp.</p>
         </label>
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>Frete padrão pra bairro fora da lista (R$)
+          <input type="number" style={inputStyleTop} value={fretePadraoDraft} onChange={(e) => setFretePadraoDraft(e.target.value)} placeholder="18" />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, textTransform: "none" }}>usado como estimativa quando o bairro do CEP não bate com nenhum da lista acima. o pedido não trava — só fica marcado como estimado, e o bairro é registrado abaixo pra você adicionar na lista se for uma área que atende com frequência.</p>
+        <BairrosDesconhecidosPanel accessToken={accessToken} />
         <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>Pedido mínimo (R$, 0 pra não ter mínimo)
           <input type="number" style={inputStyleTop} value={minimoDraft} onChange={(e) => setMinimoDraft(e.target.value)} placeholder="0" />
         </label>
@@ -1823,6 +1852,68 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       </div>
       </>
       )}
+    </div>
+  );
+}
+
+function BairrosDesconhecidosPanel({ accessToken }) {
+  const [lista, setLista] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const carregar = async () => {
+    try {
+      const rows = await sbFetch("bairros_desconhecidos?select=*&order=created_at.desc&limit=100", { accessToken });
+      setLista(rows || []);
+    } catch (e) {
+      console.error("Falha ao carregar bairros desconhecidos", e);
+      setLista([]);
+    }
+  };
+
+  useEffect(() => { carregar(); }, [accessToken]);
+
+  const remover = async (id) => {
+    setBusyId(id);
+    try {
+      await sbFetch(`bairros_desconhecidos?id=eq.${id}`, { method: "DELETE", accessToken, prefer: "return=minimal" });
+      setLista((prev) => prev.filter((b) => b.id !== id));
+    } catch (e) {
+      console.error("Falha ao remover", e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (lista === null || lista.length === 0) return null;
+
+  // agrupa contando quantas vezes cada bairro apareceu
+  const contagem = {};
+  lista.forEach((b) => { contagem[b.bairro] = (contagem[b.bairro] || 0) + 1; });
+  const unicos = Object.keys(contagem).map((bairro) => ({
+    bairro, vezes: contagem[bairro], id: lista.find((b) => b.bairro === bairro).id,
+  }));
+
+  return (
+    <div style={{ marginTop: 14, background: C.paper, border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 12 }}>
+      <p style={{ fontSize: 10.5, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8 }}>
+        Bairros não localizados ({lista.length} pedido{lista.length === 1 ? "" : "s"})
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {unicos.map((u) => (
+          <div key={u.bairro} className="flex items-center justify-between" style={{ fontSize: 12, color: C.inkSoft }}>
+            <span>{u.bairro} {u.vezes > 1 ? `(${u.vezes}x)` : ""}</span>
+            <button
+              disabled={busyId === u.id}
+              onClick={() => {
+                lista.filter((b) => b.bairro === u.bairro).forEach((b) => remover(b.id));
+              }}
+              style={{ background: "none", border: "none", color: C.red }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
