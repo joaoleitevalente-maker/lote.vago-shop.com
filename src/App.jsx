@@ -56,11 +56,37 @@ async function sbRpc(fn, args, accessToken) {
   return sbFetch(`rpc/${fn}`, { method: "POST", body: args, accessToken });
 }
 
-async function createPaymentLink({ handle, items, orderNsu, redirectUrl }) {
+function formatCaptureMethod(v) {
+  const map = { pix: "PIX", credit_card: "cartão de crédito", debit_card: "cartão de débito" };
+  return map[v] || v || "—";
+}
+
+function formatPhoneE164(telefone) {
+  const digits = (telefone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("55") && digits.length >= 12) return `+${digits}`;
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  return `+${digits}`;
+}
+
+function normalizeBairro(s) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+async function buscarCep(cep) {
+  const limpo = (cep || "").replace(/\D/g, "");
+  if (limpo.length !== 8) return null;
+  const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+  const data = await res.json();
+  if (data.erro) return null;
+  return { rua: data.logradouro || "", bairro: data.bairro || "", cidade: data.localidade || "", uf: data.uf || "" };
+}
+
+async function createPaymentLink({ handle, items, orderNsu, redirectUrl, customer, address }) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/create-payment-link`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-    body: JSON.stringify({ handle, items, order_nsu: orderNsu, redirect_url: redirectUrl }),
+    body: JSON.stringify({ handle, items, order_nsu: orderNsu, redirect_url: redirectUrl, customer, address }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ? JSON.stringify(data.error) : "falha ao gerar link de pagamento");
@@ -801,13 +827,17 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const [email, setEmail] = useState("");
   const [aceitaNovidades, setAceitaNovidades] = useState(false);
   const [entrega, setEntrega] = useState(entregaAtiva ? "entrega" : "retirada");
-  const [endereco, setEndereco] = useState("");
+  const [cep, setCep] = useState("");
+  const [rua, setRua] = useState("");
   const [bairro, setBairro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [erroCep, setErroCep] = useState("");
   const [diaEntrega, setDiaEntrega] = useState("");
   const [horarioEntrega, setHorarioEntrega] = useState("");
   const [erroData, setErroData] = useState("");
   const [dataHorarioLivre, setDataHorarioLivre] = useState("");
-  const [pagamento, setPagamento] = useState("pix");
   const [saving, setSaving] = useState(false);
 
   const zonas = deliveryZones || [];
@@ -830,18 +860,43 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const minimo = Number(pedidoMinimo) || 0;
   const bloqueadoPorMinimo = cartTotal < minimo;
 
-  const zonaSelecionada = zonas.find((z) => z.bairro === bairro);
+  const zonaSelecionada = zonas.find((z) => normalizeBairro(z.bairro) === normalizeBairro(bairro));
+  const foraDaCobertura = entrega === "entrega" && zonas.length > 0 && bairro.trim() && !zonaSelecionada;
   const frete = entrega === "entrega" ? (zonaSelecionada ? Number(zonaSelecionada.frete) : 0) : 0;
   const total = cartTotal + frete;
 
+  const cepValido = cep.replace(/\D/g, "").length === 8;
+
+  const buscarEnderecoPorCep = async (valorCep) => {
+    const limpo = valorCep.replace(/\D/g, "");
+    if (limpo.length !== 8) return;
+    setBuscandoCep(true);
+    setErroCep("");
+    try {
+      const resultado = await buscarCep(limpo);
+      if (!resultado) {
+        setErroCep("CEP não encontrado. Confira e tente de novo.");
+        setRua(""); setBairro("");
+      } else {
+        setRua(resultado.rua);
+        setBairro(resultado.bairro);
+      }
+    } catch (e) {
+      setErroCep("Não conseguimos buscar esse CEP agora. Você pode preencher manualmente.");
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
   const emailValido = /\S+@\S+\.\S+/.test(email.trim());
   const canSubmit = !bloqueadoPorMinimo && nome.trim() && telefone.trim() && emailValido && dataHorarioFinal.trim() &&
-    (entrega === "retirada" || (endereco.trim() && bairro.trim()));
+    (entrega === "retirada" || (cepValido && rua.trim() && bairro.trim() && numero.trim() && !foraDaCobertura));
 
   const buildMessage = () => {
     const linhas = cartItems.map((i) => `- ${i.qty}x ${i.name} (${brl(i.price)}) = ${brl(i.qty * i.price)}`).join("\n");
     const freteLinha = entrega === "entrega" && zonaSelecionada ? `FRETE: ${brl(frete)}` : "";
-    const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${endereco}` : "";
+    const enderecoCompleto = `${rua}, ${numero}${complemento ? " - " + complemento : ""} — CEP ${cep}`;
+    const enderecoLinha = entrega === "entrega" ? `ENDEREÇO: ${enderecoCompleto}` : "";
     const bairroLinha = entrega === "entrega" ? `BAIRRO: ${bairro}` : "";
     const tokens = {
       marca: BRAND_NAME.toUpperCase(),
@@ -857,7 +912,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       endereco_linha: enderecoLinha,
       bairro_linha: bairroLinha,
       dia_horario: dataHorarioFinal,
-      pagamento: pagamento === "pix" ? "PIX" : "Cartão de crédito",
+      pagamento: infinitepayHandle ? "aguardando confirmação (InfinitePay)" : "a combinar",
     };
     const template = mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP;
     const preenchida = template.replace(/\{(\w+)\}/g, (match, key) => (key in tokens ? tokens[key] : match));
@@ -865,10 +920,13 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   };
 
   const salvarPedido = async () => {
+    const enderecoCompleto = entrega === "entrega" ? `${rua}, ${numero}${complemento ? " - " + complemento : ""} — ${bairro} — CEP ${cep}` : "";
     const pedidoDb = {
       lote: loteAtual, nome, telefone, email, aceita_novidades: aceitaNovidades,
-      entrega, endereco: entrega === "entrega" ? `${endereco}${bairro ? " — " + bairro : ""}` : "",
-      frete, data_horario: dataHorarioFinal, pagamento,
+      entrega, endereco: enderecoCompleto,
+      cep: entrega === "entrega" ? cep : "", rua: entrega === "entrega" ? rua : "",
+      numero: entrega === "entrega" ? numero : "", complemento: entrega === "entrega" ? complemento : "",
+      frete, data_horario: dataHorarioFinal, pagamento: "",
       itens: cartItems.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
       subtotal: cartTotal, total,
     };
@@ -899,6 +957,18 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       const data = await createPaymentLink({
         handle: infinitepayHandle, items, orderNsu: orderId,
         redirectUrl: window.location.origin,
+        customer: {
+          name: nome.trim(),
+          email: email.trim(),
+          phone_number: formatPhoneE164(telefone),
+        },
+        address: entrega === "entrega" ? {
+          cep: cep.replace(/\D/g, ""),
+          street: rua,
+          neighborhood: bairro,
+          number: numero,
+          complement: complemento,
+        } : undefined,
       });
       return data?.url || null;
     } catch (e) {
@@ -920,6 +990,14 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
     const link = await gerarPagamento(orderId);
     setPaymentLink(link);
+
+    if (link && orderId) {
+      try {
+        await sbRpc("set_payment_link", { order_id: orderId, link });
+      } catch (e) {
+        console.error("Falha ao salvar link de pagamento no pedido", e);
+      }
+    }
 
     if (link) {
       window.open(link, "_blank");
@@ -1000,24 +1078,49 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
         {entrega === "entrega" && (
           <>
-            {zonas.length > 0 ? (
-              <label style={labelStyle}>Bairro
-                <select style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)}>
-                  <option value="">selecione…</option>
-                  {zonas.map((z) => <option key={z.bairro} value={z.bairro}>{z.bairro} — frete {brl(Number(z.frete))}</option>)}
-                </select>
-              </label>
-            ) : (
-              <label style={labelStyle}>Bairro
-                <input style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="seu bairro" />
-              </label>
-            )}
-            {bairro && zonaSelecionada && (
-              <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>frete para {bairro}: {brl(frete)}</p>
-            )}
-            <label style={labelStyle}>Endereço completo
-              <textarea style={{ ...inputStyle, minHeight: 64, resize: "vertical" }} value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="rua, número, complemento, ponto de referência" />
+            <label style={labelStyle}>CEP
+              <input
+                style={inputStyle}
+                value={cep}
+                maxLength={9}
+                onChange={(e) => {
+                  let v = e.target.value.replace(/\D/g, "").slice(0, 8);
+                  if (v.length > 5) v = `${v.slice(0, 5)}-${v.slice(5)}`;
+                  setCep(v);
+                  setErroCep("");
+                  if (v.replace(/\D/g, "").length === 8) buscarEnderecoPorCep(v);
+                  else { setRua(""); setBairro(""); }
+                }}
+                placeholder="00000-000"
+              />
             </label>
+            {buscandoCep && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: -8 }}>buscando endereço…</p>}
+            {erroCep && <p style={{ fontSize: 11.5, color: C.red, marginTop: -8 }}>{erroCep}</p>}
+
+            {rua && (
+              <>
+                <label style={labelStyle}>Rua
+                  <input style={inputStyle} value={rua} onChange={(e) => setRua(e.target.value)} />
+                </label>
+                <label style={labelStyle}>Bairro
+                  <input style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)} />
+                </label>
+                {zonaSelecionada && (
+                  <p style={{ fontSize: 11.5, color: C.cold, marginTop: -8 }}>frete para {bairro}: {brl(frete)}</p>
+                )}
+                {foraDaCobertura && (
+                  <p style={{ fontSize: 11.5, color: C.red, marginTop: -8 }}>ainda não entregamos em {bairro}. entre em contato pelo WhatsApp pra combinarmos.</p>
+                )}
+                <div className="flex gap-2">
+                  <label style={{ ...labelStyle, flex: 1 }}>Número
+                    <input style={inputStyle} value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="123" />
+                  </label>
+                  <label style={{ ...labelStyle, flex: 1 }}>Complemento (opcional)
+                    <input style={inputStyle} value={complemento} onChange={(e) => setComplemento(e.target.value)} placeholder="apto, bloco…" />
+                  </label>
+                </div>
+              </>
+            )}
           </>
         )}
 
@@ -1070,7 +1173,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       }}>
         <MessageCircle size={16} /> {infinitepayHandle ? "Finalizar e pagar" : "Enviar pedido pelo WhatsApp"}
       </button>
-      {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp, e-mail válido, dia/horário{entrega === "entrega" ? ", endereço" : ""}{zonas.length > 0 && entrega === "entrega" ? " e bairro" : ""} para continuar.</p>}
+      {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp, e-mail válido, dia/horário{entrega === "entrega" ? ", CEP, número e endereço válido" : ""} para continuar.</p>}
     </div>
   );
 }
@@ -1428,7 +1531,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
         <button onClick={onLogout} style={{ background: "none", border: "none", color: C.inkFaint, fontSize: 11.5, textTransform: "uppercase", textDecoration: "underline" }}>sair</button>
       </div>
 
-      {tab === "pedidos" && <OrdersPanel accessToken={accessToken} />}
+      {tab === "pedidos" && <OrdersPanel accessToken={accessToken} infinitepayHandle={infinitepayHandle} />}
       {tab === "drop" && (
       <>
 
@@ -1556,7 +1659,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   );
 }
 
-function OrdersPanel({ accessToken }) {
+function OrdersPanel({ accessToken, infinitepayHandle }) {
   const [orders, setOrders] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [filtroPago, setFiltroPago] = useState("todos"); // todos | pago | nao_pago
@@ -1575,7 +1678,7 @@ function OrdersPanel({ accessToken }) {
         aceitaNovidades: o.aceita_novidades, entrega: o.entrega, endereco: o.endereco, frete: Number(o.frete) || 0,
         dataHorario: o.data_horario, pagamento: o.pagamento, itens: o.itens || [],
         subtotal: Number(o.subtotal) || 0, total: Number(o.total) || 0,
-        pago: !!o.pago, enviado: !!o.enviado, enviadoEm: o.enviado_em,
+        pago: !!o.pago, enviado: !!o.enviado, enviadoEm: o.enviado_em, paymentLink: o.payment_link || "",
       })));
     } catch (e) {
       console.error("Falha ao carregar pedidos do Supabase", e);
@@ -1608,6 +1711,33 @@ function OrdersPanel({ accessToken }) {
       setOrders((prev) => prev.filter((o) => o.id !== id));
     } catch (e) {
       console.error("Falha ao excluir pedido", e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const gerarNovoLink = async (order) => {
+    if (!infinitepayHandle) {
+      alert("Configure a InfiniteTag no admin antes de gerar um link de pagamento.");
+      return;
+    }
+    setBusyId(order.id);
+    try {
+      const items = order.itens.map((i) => ({ quantity: i.qty, price: Math.round(i.price * 100), description: i.name }));
+      if (order.frete > 0) items.push({ quantity: 1, price: Math.round(order.frete * 100), description: "Frete" });
+      const data = await createPaymentLink({
+        handle: infinitepayHandle, items, orderNsu: order.id,
+        redirectUrl: window.location.origin,
+        customer: { name: order.nome, email: order.email, phone_number: formatPhoneE164(order.telefone) },
+      });
+      const link = data?.url;
+      if (!link) throw new Error("InfinitePay não retornou um link");
+      await sbRpc("set_payment_link", { order_id: order.id, link }, accessToken);
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, paymentLink: link } : o)));
+      window.open(link, "_blank");
+    } catch (e) {
+      console.error("Falha ao gerar novo link de pagamento", e);
+      alert("Não consegui gerar um novo link agora. Tenta de novo em instantes.");
     } finally {
       setBusyId(null);
     }
@@ -1708,10 +1838,20 @@ function OrdersPanel({ accessToken }) {
               {o.itens.map((i, idx) => <div key={idx}>{i.qty}x {i.name}</div>)}
             </div>
             <div style={{ marginTop: 8, fontSize: 11, color: C.inkFaint, lineHeight: 1.6 }}>
-              <div>{o.telefone} · {o.email}</div>
+              <div>
+                <a
+                  href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(`Oi ${o.nome}! Aqui é da ${BRAND_NAME}, sobre seu pedido do ${o.lote}.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: C.cold, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+                >
+                  <MessageCircle size={11} /> {o.telefone}
+                </a>
+                {" · "}{o.email}
+              </div>
               <div>{o.entrega === "entrega" ? `entrega — ${o.endereco}${o.frete ? ` (frete ${brl(o.frete)})` : ""}` : "retirada"}</div>
               <div>dia/horário: {o.dataHorario}</div>
-              <div>pagamento: {o.pagamento === "pix" ? "PIX" : "cartão"} {o.aceitaNovidades ? "· aceita novidades" : ""}</div>
+              <div>pagamento: {o.pago ? formatCaptureMethod(o.pagamento) : <span style={{ color: C.red }}>aguardando confirmação</span>} {o.aceitaNovidades ? "· aceita novidades" : ""}</div>
               {o.enviado && o.enviadoEm && <div>enviado em: {new Date(o.enviadoEm).toLocaleString("pt-BR")}</div>}
             </div>
 
@@ -1740,6 +1880,35 @@ function OrdersPanel({ accessToken }) {
               >
                 <Truck size={12} /> {o.enviado ? "enviado" : "marcar enviado"}
               </button>
+              {!o.pago && infinitepayHandle && (
+                <>
+                  {o.paymentLink && (
+                    <a
+                      href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(`Oi ${o.nome}! Segue o link pra concluir o pagamento do seu pedido: ${o.paymentLink}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                        textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                        background: "none", color: C.cold, border: `1px solid ${C.cold}`, textDecoration: "none",
+                      }}
+                    >
+                      <MessageCircle size={12} /> reenviar cobrança
+                    </a>
+                  )}
+                  <button
+                    disabled={busyId === o.id}
+                    onClick={() => gerarNovoLink(o)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                      textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                      background: "none", color: C.inkSoft, border: `1px solid ${C.line}`,
+                    }}
+                  >
+                    <Plus size={12} /> {o.paymentLink ? "gerar novo link" : "gerar link de pagamento"}
+                  </button>
+                </>
+              )}
               <button
                 disabled={busyId === o.id}
                 onClick={() => excluirPedido(o.id)}
