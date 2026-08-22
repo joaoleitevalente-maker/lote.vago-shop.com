@@ -8,6 +8,7 @@ import {
 // CONFIG — troque estes valores antes de publicar de verdade
 // ============================================================
 const BRAND_NAME = "vago";
+const ADMIN_PATH = "/painel-vago-2847"; // link secreto — só quem tem essa URL acessa o admin
 const LOGO_SRC = "data:image/png;base64,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";
 const DEFAULT_WHATSAPP_NUMBER = "5531999999999"; // formato: 55 + DDD + número, só dígitos
 const DEFAULT_DELIVERY_ZONES = [
@@ -54,6 +55,10 @@ async function sbSignIn(email, password) {
 
 async function sbRpc(fn, args, accessToken) {
   return sbFetch(`rpc/${fn}`, { method: "POST", body: args, accessToken });
+}
+
+function preencherTemplate(template, tokens) {
+  return (template || "").replace(/\{(\w+)\}/g, (match, key) => (key in tokens ? tokens[key] : match));
 }
 
 function formatCaptureMethod(v) {
@@ -115,6 +120,8 @@ function mapDbConfig(row) {
     pedidoMinimo: Number(row.pedido_minimo) || 0, mostrarEstoque: !!row.mostrar_estoque,
     lojaAberta: row.loja_aberta !== false, horarios: row.horarios || [],
     mensagemWhatsapp: row.mensagem_whatsapp || DEFAULT_MENSAGEM_WHATSAPP,
+    mensagemContato: row.mensagem_contato_pedido || DEFAULT_MENSAGEM_CONTATO,
+    mensagemCobranca: row.mensagem_cobranca || DEFAULT_MENSAGEM_COBRANCA,
     infinitepayHandle: row.infinitepay_handle || "",
     entregaAtiva: row.entrega_ativa !== false,
     intervaloEntrega: Number(row.intervalo_entrega_horas) || 2,
@@ -129,6 +136,8 @@ function toDbConfig(c) {
     pedido_minimo: Number(c.pedidoMinimo) || 0, mostrar_estoque: !!c.mostrarEstoque,
     loja_aberta: c.lojaAberta !== false, horarios: c.horarios || [],
     mensagem_whatsapp: c.mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP,
+    mensagem_contato_pedido: c.mensagemContato || DEFAULT_MENSAGEM_CONTATO,
+    mensagem_cobranca: c.mensagemCobranca || DEFAULT_MENSAGEM_COBRANCA,
     infinitepay_handle: c.infinitepayHandle || "",
     entrega_ativa: c.entregaAtiva !== false,
     intervalo_entrega_horas: Number(c.intervaloEntrega) || 2,
@@ -157,6 +166,8 @@ DIA/HORÁRIO: {dia_horario}
 PAGAMENTO: {pagamento}
 
 Aguardo confirmação e envio do pagamento.`;
+const DEFAULT_MENSAGEM_CONTATO = "Oi {cliente}! Aqui é da {marca}, sobre seu pedido do {lote}.";
+const DEFAULT_MENSAGEM_COBRANCA = "Oi {cliente}! Segue o link pra concluir o pagamento do seu pedido: {link}";
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const DEFAULT_HORARIOS = [
   { dia: 0, ativo: false, abre: "09:00", fecha: "18:00" },
@@ -273,7 +284,9 @@ const DEFAULT_HERO_SUBTITLE = "Peça pelo carrinho abaixo — o pedido segue dir
 
 // ============================================================
 export default function App() {
-  const [view, setView] = useState("loja");
+  const [view, setView] = useState(() => (
+    typeof window !== "undefined" && window.location.pathname === ADMIN_PATH ? "admin" : "loja"
+  ));
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState({});
@@ -294,6 +307,8 @@ export default function App() {
   const [lojaAberta, setLojaAberta] = useState(true);
   const [horarios, setHorarios] = useState(DEFAULT_HORARIOS);
   const [mensagemWhatsapp, setMensagemWhatsapp] = useState(DEFAULT_MENSAGEM_WHATSAPP);
+  const [mensagemContato, setMensagemContato] = useState(DEFAULT_MENSAGEM_CONTATO);
+  const [mensagemCobranca, setMensagemCobranca] = useState(DEFAULT_MENSAGEM_COBRANCA);
   const [infinitepayHandle, setInfinitepayHandle] = useState("");
   const [entregaAtiva, setEntregaAtiva] = useState(true);
   const [retiradaAtiva, setRetiradaAtiva] = useState(true);
@@ -334,6 +349,8 @@ export default function App() {
           setLojaAberta(cfg.lojaAberta);
           setHorarios(cfg.horarios && cfg.horarios.length > 0 ? cfg.horarios : DEFAULT_HORARIOS);
           setMensagemWhatsapp(cfg.mensagemWhatsapp);
+          setMensagemContato(cfg.mensagemContato);
+          setMensagemCobranca(cfg.mensagemCobranca);
           setInfinitepayHandle(cfg.infinitepayHandle);
           setEntregaAtiva(cfg.entregaAtiva);
           setRetiradaAtiva(cfg.retiradaAtiva);
@@ -357,6 +374,8 @@ export default function App() {
     setLojaAberta(next.lojaAberta);
     setHorarios(next.horarios);
     setMensagemWhatsapp(next.mensagemWhatsapp);
+    setMensagemContato(next.mensagemContato);
+    setMensagemCobranca(next.mensagemCobranca);
     setInfinitepayHandle(next.infinitepayHandle);
     setEntregaAtiva(next.entregaAtiva);
     setRetiradaAtiva(next.retiradaAtiva);
@@ -418,6 +437,14 @@ export default function App() {
   }, [cart, products]);
 
   const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const alvo = view === "admin" ? ADMIN_PATH : "/";
+    if (window.location.pathname !== alvo) {
+      window.history.replaceState(null, "", alvo);
+    }
+  }, [view]);
   const cartTotal = cartItems.reduce((s, i) => s + i.qty * i.price, 0);
 
   const addToCart = (id) => {
@@ -509,27 +536,40 @@ export default function App() {
           />
         )}
         {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
-      <Footer />
+      <Footer whatsappNumber={whatsappNumber} />
     </div>
   );
 }
 
-function Footer() {
+function Footer({ whatsappNumber }) {
   return (
     <footer style={{ borderTop: `1px dashed ${C.kraftLine}`, padding: "18px 4px 28px" }}>
-      <div className="max-w-5xl mx-auto px-4 flex items-center justify-center">
-        <a
-          href="https://instagram.com/lote.vago"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: "flex", alignItems: "center", gap: 6, color: C.inkSoft, fontSize: 12.5, textDecoration: "none" }}
-        >
-          <Instagram size={14} /> @lote.vago
-        </a>
+      <div className="max-w-5xl mx-auto px-4 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-4" style={{ flexWrap: "wrap", justifyContent: "center" }}>
+          <a
+            href="https://instagram.com/lote.vago"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 6, color: C.inkSoft, fontSize: 12.5, textDecoration: "none" }}
+          >
+            <Instagram size={14} /> @lote.vago
+          </a>
+          {whatsappNumber && (
+            <a
+              href={`https://wa.me/${formatPhoneE164(whatsappNumber).replace("+", "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "flex", alignItems: "center", gap: 6, color: C.inkSoft, fontSize: 12.5, textDecoration: "none" }}
+            >
+              <MessageCircle size={14} /> WhatsApp
+            </a>
+          )}
+        </div>
+        <p style={{ fontSize: 11, color: C.inkFaint }}>Belo Horizonte - MG</p>
       </div>
     </footer>
   );
@@ -564,13 +604,6 @@ function Header({ view, setView, cartCount, loteAtual }) {
           </div>
         </button>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView("admin")}
-            title="Painel do administrador"
-            style={{ background: "none", border: "none", color: view === "admin" ? C.cold : C.inkFaint, padding: 6 }}
-          >
-            <Lock size={18} />
-          </button>
           <button
             onClick={() => setView("carrinho")}
             style={{ background: C.ink, border: "none", borderRadius: 999, padding: "8px 14px", color: C.paper, display: "flex", alignItems: "center", gap: 8 }}
@@ -914,8 +947,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       dia_horario: dataHorarioFinal,
       pagamento: infinitepayHandle ? "aguardando confirmação (InfinitePay)" : "a combinar",
     };
-    const template = mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP;
-    const preenchida = template.replace(/\{(\w+)\}/g, (match, key) => (key in tokens ? tokens[key] : match));
+    const preenchida = preencherTemplate(mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP, tokens);
     return preenchida.replace(/\n{3,}/g, "\n\n").trim();
   };
 
@@ -1253,7 +1285,7 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [categoriesDraft, setCategoriesDraft] = useState(
@@ -1263,6 +1295,8 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   const [loteDraft, setLoteDraft] = useState(loteAtual);
   const [whatsappDraft, setWhatsappDraft] = useState(whatsappNumber);
   const [mensagemDraft, setMensagemDraft] = useState(mensagemWhatsapp || DEFAULT_MENSAGEM_WHATSAPP);
+  const [mensagemContatoDraft, setMensagemContatoDraft] = useState(mensagemContato || DEFAULT_MENSAGEM_CONTATO);
+  const [mensagemCobrancaDraft, setMensagemCobrancaDraft] = useState(mensagemCobranca || DEFAULT_MENSAGEM_COBRANCA);
   const [infinitepayDraft, setInfinitepayDraft] = useState(infinitepayHandle || "");
   const [entregaAtivaDraft, setEntregaAtivaDraft] = useState(entregaAtiva !== false);
   const [retiradaAtivaDraft, setRetiradaAtivaDraft] = useState(retiradaAtiva !== false);
@@ -1274,7 +1308,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   const [intervaloDraft, setIntervaloDraft] = useState(intervaloEntrega || 2);
   const [configSaved, setConfigSaved] = useState(false);
   const [productsSaved, setProductsSaved] = useState(false);
-  const [tab, setTab] = useState("drop"); // drop | pedidos
+  const [tab, setTab] = useState("config"); // config | produtos | pedidos | relatorios
   
 
   const persistProducts = (next) => {
@@ -1292,6 +1326,8 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       mostrarEstoque: mostrarEstoqueDraft,
       lojaAberta: lojaAbertaDraft, horarios: horariosDraft, intervaloEntrega: Number(intervaloDraft) || 2,
       mensagemWhatsapp: mensagemDraft,
+      mensagemContato: mensagemContatoDraft,
+      mensagemCobranca: mensagemCobrancaDraft,
       infinitepayHandle: infinitepayDraft.trim(),
       entregaAtiva: entregaAtivaDraft,
       retiradaAtiva: retiradaAtivaDraft,
@@ -1353,6 +1389,34 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
 
   return (
     <div style={{ paddingTop: 26 }} className="fade-up">
+      <div className="flex items-center justify-between" style={{ marginBottom: 18 }}>
+        <div className="flex gap-2" style={{ flexWrap: "wrap" }}>
+          {[
+            { v: "config", label: "Configurações" },
+            { v: "produtos", label: "Produtos" },
+            { v: "pedidos", label: "Pedidos" },
+            { v: "relatorios", label: "Relatórios" },
+          ].map(({ v, label }) => (
+            <button key={v} onClick={() => setTab(v)} style={{
+              padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, textTransform: "uppercase",
+              background: tab === v ? C.ink : "none", color: tab === v ? C.paper : C.inkSoft,
+              border: `1px solid ${tab === v ? C.ink : C.line}`,
+            }}>{label}</button>
+          ))}
+        </div>
+        <button onClick={onLogout} style={{ background: "none", border: "none", color: C.inkFaint, fontSize: 11.5, textTransform: "uppercase", textDecoration: "underline", flexShrink: 0 }}>sair</button>
+      </div>
+
+      {tab === "relatorios" && (
+        <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
+          relatórios em construção — em breve por aqui.
+        </div>
+      )}
+
+      {tab === "pedidos" && <OrdersPanel accessToken={accessToken} infinitepayHandle={infinitepayHandle} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} />}
+
+      {tab === "config" && (
+      <>
       <div style={{ background: C.white, border: `1px solid ${C.kraftLine}`, borderRadius: 4, padding: 16, marginBottom: 18 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
           <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: C.inkSoft }}>Loja e horários</p>
@@ -1412,10 +1476,10 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           <input style={inputStyleTop} value={infinitepayDraft} onChange={(e) => setInfinitepayDraft(e.target.value.replace(/^\$/, "").trim())} placeholder="vagoloja" />
         </label>
         <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>seu @ do InfinitePay, sem o $. Preenchido = o cliente paga direto (PIX/cartão) ao finalizar. Vazio = volta a enviar só por WhatsApp.</p>
-        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>WhatsApp para receber pedidos
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>WhatsApp da loja (pedidos e suporte)
           <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
         </label>
-        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>só números: 55 + DDD + número. Ex: 5531999999999</p>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>só números: 55 + DDD + número. Ex: 5531999999999 — esse número recebe os pedidos e também aparece como contato de suporte no rodapé do site.</p>
         {/* --- GERENCIAR CATEGORIAS --- */}
         <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Gerenciar Categorias</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1469,6 +1533,36 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           borderRadius: 4, padding: "6px 12px", fontSize: 11, textTransform: "uppercase"
         }}>restaurar mensagem padrão</button>
 
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 18 }}>Mensagem ao clicar no telefone do pedido (contato geral)
+          <textarea
+            style={{ ...inputStyleTop, minHeight: 70, resize: "vertical", fontFamily: "'Courier Prime', monospace", fontSize: 12.5, lineHeight: 1.6 }}
+            value={mensagemContatoDraft}
+            onChange={(e) => setMensagemContatoDraft(e.target.value)}
+          />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, textTransform: "none" }}>
+          marcadores disponíveis: {"{marca} {cliente} {lote}"}
+        </p>
+        <button onClick={() => setMensagemContatoDraft(DEFAULT_MENSAGEM_CONTATO)} style={{
+          marginTop: 6, background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
+          borderRadius: 4, padding: "6px 12px", fontSize: 11, textTransform: "uppercase"
+        }}>restaurar mensagem padrão</button>
+
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 18 }}>Mensagem do botão "reenviar cobrança"
+          <textarea
+            style={{ ...inputStyleTop, minHeight: 70, resize: "vertical", fontFamily: "'Courier Prime', monospace", fontSize: 12.5, lineHeight: 1.6 }}
+            value={mensagemCobrancaDraft}
+            onChange={(e) => setMensagemCobrancaDraft(e.target.value)}
+          />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4, textTransform: "none" }}>
+          marcadores disponíveis: {"{marca} {cliente} {link}"}
+        </p>
+        <button onClick={() => setMensagemCobrancaDraft(DEFAULT_MENSAGEM_COBRANCA)} style={{
+          marginTop: 6, background: "none", border: `1px dashed ${C.kraftLine}`, color: C.inkSoft,
+          borderRadius: 4, padding: "6px 12px", fontSize: 11, textTransform: "uppercase"
+        }}>restaurar mensagem padrão</button>
+
         <p style={{ ...labelStyleTop, display: "block", marginTop: 14, marginBottom: 6 }}>Formas de recebimento</p>
         <div className="flex flex-wrap gap-4">
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -1517,22 +1611,10 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           <Save size={14} /> {configSaved ? "Salvo!" : "Salvar configurações"}
         </button>
       </div>
+      </>
+      )}
 
-      <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-        <div className="flex gap-2">
-          {[{ v: "drop", label: "Gerenciar drop" }, { v: "pedidos", label: "Pedidos" }].map(({ v, label }) => (
-            <button key={v} onClick={() => setTab(v)} style={{
-              padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, textTransform: "uppercase",
-              background: tab === v ? C.ink : "none", color: tab === v ? C.paper : C.inkSoft,
-              border: `1px solid ${tab === v ? C.ink : C.line}`,
-            }}>{label}</button>
-          ))}
-        </div>
-        <button onClick={onLogout} style={{ background: "none", border: "none", color: C.inkFaint, fontSize: 11.5, textTransform: "uppercase", textDecoration: "underline" }}>sair</button>
-      </div>
-
-      {tab === "pedidos" && <OrdersPanel accessToken={accessToken} infinitepayHandle={infinitepayHandle} />}
-      {tab === "drop" && (
+      {tab === "produtos" && (
       <>
 
       <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
@@ -1659,7 +1741,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   );
 }
 
-function OrdersPanel({ accessToken, infinitepayHandle }) {
+function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagemCobranca }) {
   const [orders, setOrders] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [filtroPago, setFiltroPago] = useState("todos"); // todos | pago | nao_pago
@@ -1840,7 +1922,7 @@ function OrdersPanel({ accessToken, infinitepayHandle }) {
             <div style={{ marginTop: 8, fontSize: 11, color: C.inkFaint, lineHeight: 1.6 }}>
               <div>
                 <a
-                  href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(`Oi ${o.nome}! Aqui é da ${BRAND_NAME}, sobre seu pedido do ${o.lote}.`)}`}
+                  href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(preencherTemplate(mensagemContato || DEFAULT_MENSAGEM_CONTATO, { marca: BRAND_NAME, cliente: o.nome, lote: o.lote }))}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: C.cold, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}
@@ -1884,7 +1966,7 @@ function OrdersPanel({ accessToken, infinitepayHandle }) {
                 <>
                   {o.paymentLink && (
                     <a
-                      href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(`Oi ${o.nome}! Segue o link pra concluir o pagamento do seu pedido: ${o.paymentLink}`)}`}
+                      href={`https://wa.me/${formatPhoneE164(o.telefone).replace("+", "")}?text=${encodeURIComponent(preencherTemplate(mensagemCobranca || DEFAULT_MENSAGEM_COBRANCA, { marca: BRAND_NAME, cliente: o.nome, link: o.paymentLink }))}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
