@@ -61,6 +61,30 @@ function preencherTemplate(template, tokens) {
   return (template || "").replace(/\{(\w+)\}/g, (match, key) => (key in tokens ? tokens[key] : match));
 }
 
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+function isValidEmail(email) {
+  const v = (email || "").trim();
+  if (v.length === 0 || v.length > 254) return false;
+  return EMAIL_REGEX.test(v);
+}
+
+// aceita telefone fixo (DDD + 8 dígitos) ou celular (DDD + 9 + 8 dígitos)
+function isValidTelefoneBR(telefone) {
+  const d = (telefone || "").replace(/\D/g, "");
+  if (d.length === 11) return /^[1-9][1-9]9\d{8}$/.test(d);
+  if (d.length === 10) return /^[1-9][1-9][2-5]\d{7}$/.test(d);
+  return false;
+}
+
+function formatTelefoneInput(v) {
+  const d = (v || "").replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 function formatCaptureMethod(v) {
   const map = { pix: "PIX", credit_card: "cartão de crédito", debit_card: "cartão de débito" };
   return map[v] || v || "—";
@@ -858,6 +882,8 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+  const [emailTocado, setEmailTocado] = useState(false);
+  const [telefoneTocado, setTelefoneTocado] = useState(false);
   const [aceitaNovidades, setAceitaNovidades] = useState(false);
   const [entrega, setEntrega] = useState(entregaAtiva ? "entrega" : "retirada");
   const [cep, setCep] = useState("");
@@ -921,8 +947,9 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
     }
   };
 
-  const emailValido = /\S+@\S+\.\S+/.test(email.trim());
-  const canSubmit = !bloqueadoPorMinimo && nome.trim() && telefone.trim() && emailValido && dataHorarioFinal.trim() &&
+  const emailValido = isValidEmail(email);
+  const telefoneValido = isValidTelefoneBR(telefone);
+  const canSubmit = !bloqueadoPorMinimo && nome.trim().length >= 2 && telefoneValido && emailValido && dataHorarioFinal.trim() &&
     (entrega === "retirada" || (cepValido && rua.trim() && bairro.trim() && numero.trim() && !foraDaCobertura));
 
   const buildMessage = () => {
@@ -1069,13 +1096,38 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <label style={labelStyle}>Nome
-          <input style={inputStyle} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="seu nome" />
+          <input style={inputStyle} value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} placeholder="seu nome" />
         </label>
         <label style={labelStyle}>WhatsApp para contato
-          <input style={inputStyle} value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(31) 90000-0000" />
+          <input
+            style={inputStyle}
+            value={telefone}
+            inputMode="numeric"
+            onChange={(e) => setTelefone(formatTelefoneInput(e.target.value))}
+            onBlur={() => setTelefoneTocado(true)}
+            placeholder="(31) 90000-0000"
+          />
+          {telefoneTocado && telefone && !telefoneValido && (
+            <span style={{ display: "block", color: C.red, fontSize: 11, fontWeight: 400, textTransform: "none", marginTop: 4 }}>
+              número inválido — confira o DDD e a quantidade de dígitos.
+            </span>
+          )}
         </label>
         <label style={labelStyle}>E-mail
-          <input type="email" style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
+          <input
+            type="email"
+            style={inputStyle}
+            value={email}
+            maxLength={254}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTocado(true)}
+            placeholder="seu@email.com"
+          />
+          {emailTocado && email && !emailValido && (
+            <span style={{ display: "block", color: C.red, fontSize: 11, fontWeight: 400, textTransform: "none", marginTop: 4 }}>
+              e-mail inválido — confira se está completo (ex: nome@email.com).
+            </span>
+          )}
         </label>
 
         <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
@@ -1145,10 +1197,10 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
                 )}
                 <div className="flex gap-2">
                   <label style={{ ...labelStyle, flex: 1 }}>Número
-                    <input style={inputStyle} value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="123" />
+                    <input style={inputStyle} value={numero} maxLength={10} onChange={(e) => setNumero(e.target.value)} placeholder="123" />
                   </label>
                   <label style={{ ...labelStyle, flex: 1 }}>Complemento (opcional)
-                    <input style={inputStyle} value={complemento} onChange={(e) => setComplemento(e.target.value)} placeholder="apto, bloco…" />
+                    <input style={inputStyle} value={complemento} maxLength={40} onChange={(e) => setComplemento(e.target.value)} placeholder="apto, bloco…" />
                   </label>
                 </div>
               </>
@@ -1205,7 +1257,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       }}>
         <MessageCircle size={16} /> {infinitepayHandle ? "Finalizar e pagar" : "Enviar pedido pelo WhatsApp"}
       </button>
-      {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp, e-mail válido, dia/horário{entrega === "entrega" ? ", CEP, número e endereço válido" : ""} para continuar.</p>}
+      {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp válido, e-mail válido, dia/horário{entrega === "entrega" ? ", CEP, número e endereço válido" : ""} para continuar.</p>}
     </div>
   );
 }
