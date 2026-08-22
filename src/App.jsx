@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ShoppingCart, Plus, Minus, X, Snowflake, Truck, Store as StoreIcon,
-  Lock, ArrowLeft, Check, MessageCircle, Pencil, Trash2, EyeOff, Save, Instagram
+  Lock, ArrowLeft, Check, MessageCircle, Pencil, Trash2, EyeOff, Save, Instagram, Shield
 } from "lucide-react";
 
 // ============================================================
@@ -147,6 +147,7 @@ function mapDbConfig(row) {
     mensagemContato: row.mensagem_contato_pedido || DEFAULT_MENSAGEM_CONTATO,
     mensagemCobranca: row.mensagem_cobranca || DEFAULT_MENSAGEM_COBRANCA,
     infinitepayHandle: row.infinitepay_handle || "",
+    infinitepayLogoUrl: row.infinitepay_logo_url || "",
     entregaAtiva: row.entrega_ativa !== false,
     intervaloEntrega: Number(row.intervalo_entrega_horas) || 2,
     retiradaAtiva: row.retirada_ativa !== false,
@@ -163,6 +164,7 @@ function toDbConfig(c) {
     mensagem_contato_pedido: c.mensagemContato || DEFAULT_MENSAGEM_CONTATO,
     mensagem_cobranca: c.mensagemCobranca || DEFAULT_MENSAGEM_COBRANCA,
     infinitepay_handle: c.infinitepayHandle || "",
+    infinitepay_logo_url: c.infinitepayLogoUrl || "",
     entrega_ativa: c.entregaAtiva !== false,
     intervalo_entrega_horas: Number(c.intervaloEntrega) || 2,
     retirada_ativa: c.retiradaAtiva !== false,
@@ -334,6 +336,7 @@ export default function App() {
   const [mensagemContato, setMensagemContato] = useState(DEFAULT_MENSAGEM_CONTATO);
   const [mensagemCobranca, setMensagemCobranca] = useState(DEFAULT_MENSAGEM_COBRANCA);
   const [infinitepayHandle, setInfinitepayHandle] = useState("");
+  const [infinitepayLogoUrl, setInfinitepayLogoUrl] = useState("");
   const [entregaAtiva, setEntregaAtiva] = useState(true);
   const [retiradaAtiva, setRetiradaAtiva] = useState(true);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -376,6 +379,7 @@ export default function App() {
           setMensagemContato(cfg.mensagemContato);
           setMensagemCobranca(cfg.mensagemCobranca);
           setInfinitepayHandle(cfg.infinitepayHandle);
+          setInfinitepayLogoUrl(cfg.infinitepayLogoUrl);
           setEntregaAtiva(cfg.entregaAtiva);
           setRetiradaAtiva(cfg.retiradaAtiva);
           setCategories(cfg.categories);
@@ -401,6 +405,7 @@ export default function App() {
     setMensagemContato(next.mensagemContato);
     setMensagemCobranca(next.mensagemCobranca);
     setInfinitepayHandle(next.infinitepayHandle);
+    setInfinitepayLogoUrl(next.infinitepayLogoUrl);
     setEntregaAtiva(next.entregaAtiva);
     setRetiradaAtiva(next.retiradaAtiva);
     setCategories(next.categories);
@@ -539,6 +544,7 @@ export default function App() {
             intervaloEntrega={intervaloEntrega}
             mensagemWhatsapp={mensagemWhatsapp}
             infinitepayHandle={infinitepayHandle}
+            infinitepayLogoUrl={infinitepayLogoUrl}
             entregaAtiva={entregaAtiva}
             retiradaAtiva={retiradaAtiva}
             setPaymentLink={setPaymentLink}
@@ -560,16 +566,16 @@ export default function App() {
           />
         )}
         {view === "admin" && accessToken && (
-          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} infinitepayHandle={infinitepayHandle} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
+          <Admin products={products} saveProducts={saveProducts} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} whatsappNumber={whatsappNumber} deliveryZones={deliveryZones} pedidoMinimo={pedidoMinimo} mostrarEstoque={mostrarEstoque} lojaAberta={lojaAberta} horarios={horarios} mensagemWhatsapp={mensagemWhatsapp} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} infinitepayHandle={infinitepayHandle} infinitepayLogoUrl={infinitepayLogoUrl} entregaAtiva={entregaAtiva} retiradaAtiva={retiradaAtiva} categories={categories} intervaloEntrega={intervaloEntrega} saveConfig={saveConfig} accessToken={accessToken} onLogout={logout} />
         )}
       </main>
 
-      <Footer whatsappNumber={whatsappNumber} />
+      <Footer whatsappNumber={whatsappNumber} infinitepayHandle={infinitepayHandle} infinitepayLogoUrl={infinitepayLogoUrl} />
     </div>
   );
 }
 
-function Footer({ whatsappNumber }) {
+function Footer({ whatsappNumber, infinitepayHandle, infinitepayLogoUrl }) {
   return (
     <footer style={{ borderTop: `1px dashed ${C.kraftLine}`, padding: "18px 4px 28px" }}>
       <div className="max-w-5xl mx-auto px-4 flex flex-col items-center gap-3">
@@ -593,6 +599,16 @@ function Footer({ whatsappNumber }) {
             </a>
           )}
         </div>
+        {infinitepayHandle && (
+          <div className="flex items-center gap-2">
+            {infinitepayLogoUrl ? (
+              <img src={infinitepayLogoUrl} alt="InfinitePay" style={{ height: 14, objectFit: "contain" }} />
+            ) : (
+              <Shield size={12} color={C.inkFaint} />
+            )}
+            <span style={{ fontSize: 10, color: C.inkFaint }}>pagamentos processados com segurança pela InfinitePay</span>
+          </div>
+        )}
         <p style={{ fontSize: 11, color: C.inkFaint }}>Belo Horizonte - MG</p>
       </div>
     </footer>
@@ -878,7 +894,7 @@ function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, se
 }
 
 // ============================================================
-function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, entregaAtiva, retiradaAtiva, onStockDecremented, setPaymentLink }) {
+function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, onStockDecremented, setPaymentLink }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
@@ -1257,6 +1273,18 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       }}>
         <MessageCircle size={16} /> {infinitepayHandle ? "Finalizar e pagar" : "Enviar pedido pelo WhatsApp"}
       </button>
+      {infinitepayHandle && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 12 }}>
+          {infinitepayLogoUrl ? (
+            <img src={infinitepayLogoUrl} alt="InfinitePay" style={{ height: 16, objectFit: "contain" }} />
+          ) : (
+            <Shield size={13} color={C.inkFaint} />
+          )}
+          <span style={{ fontSize: 10.5, color: C.inkFaint, textAlign: "center" }}>
+            pagamento processado com segurança pela InfinitePay — instituição autorizada pelo Banco Central
+          </span>
+        </div>
+      )}
       {!canSubmit && !bloqueadoPorMinimo && <p style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>preencha nome, WhatsApp válido, e-mail válido, dia/horário{entrega === "entrega" ? ", CEP, número e endereço válido" : ""} para continuar.</p>}
     </div>
   );
@@ -1337,7 +1365,7 @@ function emptyProduct(loteAtual) {
   return { id: "p" + Date.now(), name: "", desc: "", price: "", stock: "", frozen: false, category: "Congelados", lote: loteAtual, active: true, images: [], tags: [] };
 }
 
-function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, saveConfig, accessToken, onLogout }) {
+function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [categoriesDraft, setCategoriesDraft] = useState(
@@ -1350,6 +1378,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
   const [mensagemContatoDraft, setMensagemContatoDraft] = useState(mensagemContato || DEFAULT_MENSAGEM_CONTATO);
   const [mensagemCobrancaDraft, setMensagemCobrancaDraft] = useState(mensagemCobranca || DEFAULT_MENSAGEM_COBRANCA);
   const [infinitepayDraft, setInfinitepayDraft] = useState(infinitepayHandle || "");
+  const [infinitepayLogoDraft, setInfinitepayLogoDraft] = useState(infinitepayLogoUrl || "");
   const [entregaAtivaDraft, setEntregaAtivaDraft] = useState(entregaAtiva !== false);
   const [retiradaAtivaDraft, setRetiradaAtivaDraft] = useState(retiradaAtiva !== false);
   const [zonesDraft, setZonesDraft] = useState(deliveryZones && deliveryZones.length > 0 ? [...deliveryZones] : []);
@@ -1381,6 +1410,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       mensagemContato: mensagemContatoDraft,
       mensagemCobranca: mensagemCobrancaDraft,
       infinitepayHandle: infinitepayDraft.trim(),
+      infinitepayLogoUrl: infinitepayLogoDraft.trim(),
       entregaAtiva: entregaAtivaDraft,
       retiradaAtiva: retiradaAtivaDraft,
       categories: categoriesDraft.filter((c) => c.trim()),
@@ -1528,6 +1558,10 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           <input style={inputStyleTop} value={infinitepayDraft} onChange={(e) => setInfinitepayDraft(e.target.value.replace(/^\$/, "").trim())} placeholder="vagoloja" />
         </label>
         <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>seu @ do InfinitePay, sem o $. Preenchido = o cliente paga direto (PIX/cartão) ao finalizar. Vazio = volta a enviar só por WhatsApp.</p>
+        <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>Logo oficial da InfinitePay (opcional, selo de segurança no checkout)
+          <input style={inputStyleTop} value={infinitepayLogoDraft} onChange={(e) => setInfinitepayLogoDraft(e.target.value)} placeholder="https://…" />
+        </label>
+        <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 4 }}>baixe a logo oficial em infinitepay.io/newsroom-media, hospede em algum lugar (ex: um link de imagem) e cole a URL aqui. Sem logo, mostra um ícone de escudo no lugar.</p>
         <label style={{ ...labelStyleTop, display: "block", marginTop: 10 }}>WhatsApp da loja (pedidos e suporte)
           <input style={inputStyleTop} value={whatsappDraft} onChange={(e) => setWhatsappDraft(e.target.value.replace(/[^\d]/g, ""))} placeholder="5531999999999" />
         </label>
