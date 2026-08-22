@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ShoppingCart, Plus, Minus, X, Snowflake, Truck, Store as StoreIcon,
-  Lock, ArrowLeft, Check, MessageCircle, Pencil, Trash2, EyeOff, Save, Instagram, Shield
+  Lock, ArrowLeft, Check, MessageCircle, Pencil, Trash2, EyeOff, Save, Instagram, Shield,
+  User, LogOut, Mail, GripVertical
 } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+const RelatoriosPanel = React.lazy(() => import("./RelatoriosPanel.jsx"));
 
 // ============================================================
 // CONFIG — troque estes valores antes de publicar de verdade
 // ============================================================
 const BRAND_NAME = "vago";
 const ADMIN_PATH = "/painel-vago-2847"; // link secreto — só quem tem essa URL acessa o admin
+const PEDIDO_CONFIRMADO_PATH = "/pedido-confirmado";
+const CART_STORAGE_KEY = "vago_cart_v1";
 const LOGO_SRC = "data:image/png;base64,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";
 const DEFAULT_WHATSAPP_NUMBER = "5531999999999"; // formato: 55 + DDD + número, só dígitos
 const DEFAULT_DELIVERY_ZONES = [
@@ -21,6 +26,11 @@ const TEST_GELATO_IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD
 const DEFAULT_LOTE = "Lote 07";
 const SUPABASE_URL = "https://ecdanjynjukbfjwjxcdo.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZGFuanluanVrYmZqd2p4Y2RvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyNDkwNjMsImV4cCI6MjEwMjgyNTA2M30.qwu6c0WzqgvZJ0u6XpAjjNxuA7-y3i7MxLr2Z58hKWE";
+
+// cliente oficial do Supabase — usado só pra autenticação de clientes (OTP e Google),
+// já que exige fluxos (PKCE, OAuth redirect, refresh de sessão) difíceis de reimplementar na mão.
+// o resto do app (produtos, pedidos, admin) continua usando o sbFetch/sbRpc de sempre.
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Wrapper simples de fetch pra API REST do Supabase (PostgREST) — sem depender de pacote npm externo
 async function sbFetch(path, { method = "GET", body, accessToken, prefer } = {}) {
@@ -127,14 +137,14 @@ function mapDbProduct(row) {
   return {
     id: row.id, name: row.name, desc: row.description, price: Number(row.price), stock: row.stock,
     frozen: row.frozen, category: row.category, lote: row.lote, active: row.active,
-    images: row.images || [], tags: row.tags || [],
+    images: row.images || [], tags: row.tags || [], posicao: row.posicao ?? 999999,
   };
 }
 function toDbProduct(p) {
   return {
     id: p.id, name: p.name, description: p.desc, price: Number(p.price) || 0, stock: Number(p.stock) || 0,
     frozen: !!p.frozen, category: p.category, lote: p.lote, active: p.active !== false,
-    images: p.images || [], tags: p.tags || [],
+    images: p.images || [], tags: p.tags || [], posicao: p.posicao ?? 999999,
   };
 }
 function mapDbConfig(row) {
@@ -312,13 +322,37 @@ const DEFAULT_HERO_SUBTITLE = "Peça pelo carrinho abaixo — o pedido segue dir
 
 // ============================================================
 export default function App() {
-  const [view, setView] = useState(() => (
-    typeof window !== "undefined" && window.location.pathname === ADMIN_PATH ? "admin" : "loja"
-  ));
+  const [view, setView] = useState(() => {
+    if (typeof window === "undefined") return "loja";
+    if (window.location.pathname === ADMIN_PATH) return "admin";
+    if (window.location.pathname === PEDIDO_CONFIRMADO_PATH) return "pedido-confirmado";
+    return "loja";
+  });
+  const pedidoConfirmadoId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("id") : null;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState(() => {
+    try {
+      if (typeof window === "undefined") return {};
+      const saved = window.localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Falha ao ler carrinho salvo", e);
+      return {};
+    }
+  });
   const [accessToken, setAccessToken] = useState(null);
+  const [customerSession, setCustomerSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+  const mostrarToast = (msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2200);
+  };
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -353,10 +387,75 @@ export default function App() {
     return () => document.head.removeChild(link);
   }, []);
 
+  // acompanha o login/logout do cliente (e-mail OTP ou Google)
+  useEffect(() => {
+    supabaseClient.auth.getSession().then(({ data }) => setCustomerSession(data.session));
+    const { data: listener } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      setCustomerSession(session);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // carrega o perfil do cliente assim que ele loga
+  useEffect(() => {
+    if (!customerSession) { setProfile(null); return; }
+    (async () => {
+      try {
+        const rows = await sbFetch(`profiles?id=eq.${customerSession.user.id}&select=*`, { accessToken: customerSession.access_token });
+        setProfile(rows && rows[0] ? rows[0] : null);
+      } catch (e) {
+        console.error("Falha ao carregar perfil do cliente", e);
+      }
+    })();
+  }, [customerSession]);
+
+  const salvarPerfil = async (dados) => {
+    if (!customerSession) return;
+    try {
+      await sbFetch(`profiles?id=eq.${customerSession.user.id}`, {
+        method: "PATCH", accessToken: customerSession.access_token, prefer: "return=minimal",
+        body: { ...dados, updated_at: new Date().toISOString() },
+      });
+      setProfile((prev) => ({ ...prev, ...dados }));
+    } catch (e) {
+      console.error("Falha ao salvar perfil", e);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+      console.error("Falha ao salvar carrinho", e);
+    }
+  }, [cart]);
+
+  // ao carregar os produtos, ajusta o carrinho salvo: remove itens que não existem mais
+  // e trava a quantidade no limite do estoque atual (evita comprar mais do que tem)
+  useEffect(() => {
+    if (loading || products.length === 0) return;
+    setCart((prev) => {
+      let mudou = false;
+      const ajustado = {};
+      for (const [id, qty] of Object.entries(prev)) {
+        const produto = products.find((p) => p.id === id);
+        if (!produto || produto.active === false || produto.stock <= 0) {
+          mudou = true;
+          continue;
+        }
+        const qtyAjustada = Math.min(qty, produto.stock);
+        if (qtyAjustada !== qty) mudou = true;
+        if (qtyAjustada > 0) ajustado[id] = qtyAjustada;
+      }
+      return mudou ? ajustado : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, products.length]);
+
   useEffect(() => {
     (async () => {
       try {
-        const rows = await sbFetch("products?select=*&order=created_at.asc");
+        const rows = await sbFetch("products?select=*&order=posicao.asc");
         setProducts((rows || []).map(mapDbProduct));
       } catch (e) {
         console.error("Falha ao carregar produtos do Supabase", e);
@@ -474,6 +573,7 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (view === "pedido-confirmado") return; // mantém a URL com ?id=... intacta, não redireciona
     const alvo = view === "admin" ? ADMIN_PATH : "/";
     if (window.location.pathname !== alvo) {
       window.history.replaceState(null, "", alvo);
@@ -486,6 +586,7 @@ export default function App() {
     const current = cart[id] || 0;
     if (!product || current >= product.stock) return;
     setCart({ ...cart, [id]: current + 1 });
+    mostrarToast(`${product.name} adicionado ao carrinho`);
   };
   const decFromCart = (id) => {
     const current = cart[id] || 0;
@@ -514,24 +615,36 @@ export default function App() {
         body { background: ${C.paper}; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .fade-up { animation: fadeUp .35s ease both; }
+
+        input:focus, textarea:focus, select:focus {
+          outline: none;
+          border-color: ${C.ink} !important;
+          box-shadow: 0 0 0 1px ${C.ink};
+        }
+
+        /* evita o zoom automático do Safari/iOS ao focar campos com fonte menor que 16px */
+        @media (max-width: 640px) {
+          input, textarea, select { font-size: 16px !important; }
+        }
+
+        .tag-sticker { transition: transform .18s ease, box-shadow .18s ease; }
+        .tag-sticker:hover { transform: rotate(-1deg) translateY(-2px) scale(1.04); box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+
+        @keyframes slideDrawer { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .drawer-slide { animation: slideDrawer .28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+        @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .toast-in { animation: toastIn .25s ease both; }
+
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        .skeleton { background: linear-gradient(90deg, ${C.paperDim} 25%, ${C.line} 37%, ${C.paperDim} 63%); background-size: 800px 100%; animation: shimmer 1.4s ease infinite; }
       `}</style>
 
-      <Header view={view} setView={setView} cartCount={cartCount} loteAtual={loteAtual} />
+      <Header view={view} setView={setView} cartCount={cartCount} loteAtual={loteAtual} customerSession={customerSession} onAccountClick={() => (customerSession ? setView("perfil") : setShowLoginModal(true))} onCartClick={() => setCartOpen(true)} />
 
       <main className="max-w-5xl mx-auto px-4 pb-24">
         {view === "loja" && (
-          <Store products={products} loading={loading} cart={cart} addToCart={addToCart} setView={setView} cartCount={cartCount} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} mostrarEstoque={mostrarEstoque} />
-        )}
-        {view === "carrinho" && (
-          <Cart
-            cartItems={cartItems}
-            addToCart={addToCart}
-            decFromCart={decFromCart}
-            removeFromCart={removeFromCart}
-            cartTotal={cartTotal}
-            setView={setView}
-            pedidoMinimo={pedidoMinimo}
-          />
+          <Store products={products} loading={loading} cart={cart} addToCart={addToCart} setView={setView} cartCount={cartCount} heroTitle={heroTitle} heroSubtitle={heroSubtitle} loteAtual={loteAtual} mostrarEstoque={mostrarEstoque} onOpenCart={() => setCartOpen(true)} categories={categories} />
         )}
         {view === "checkout" && (
           <Checkout
@@ -554,6 +667,10 @@ export default function App() {
             entregaAtiva={entregaAtiva}
             retiradaAtiva={retiradaAtiva}
             setPaymentLink={setPaymentLink}
+            customerSession={customerSession}
+            profile={profile}
+            salvarPerfil={salvarPerfil}
+            onOpenCart={() => setCartOpen(true)}
             onStockDecremented={(decrements) => {
               setProducts((prev) => prev.map((p) => {
                 const dec = decrements.find((d) => d.id === p.id);
@@ -563,6 +680,15 @@ export default function App() {
           />
         )}
         {view === "sucesso" && <Sucesso message={lastMessage} setView={setView} paymentLink={paymentLink} whatsappNumber={whatsappNumber} />}
+        {view === "pedido-confirmado" && <PedidoConfirmado orderId={pedidoConfirmadoId} whatsappNumber={whatsappNumber} />}
+        {view === "perfil" && (
+          <Perfil
+            customerSession={customerSession}
+            profile={profile}
+            salvarPerfil={salvarPerfil}
+            setView={setView}
+          />
+        )}
         {view === "admin" && !accessToken && (
           <AdminLogin
             email={loginEmail} setEmail={setLoginEmail}
@@ -577,6 +703,29 @@ export default function App() {
       </main>
 
       <Footer whatsappNumber={whatsappNumber} infinitepayHandle={infinitepayHandle} infinitepayLogoUrl={infinitepayLogoUrl} />
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      {cartOpen && (
+        <Cart
+          cartItems={cartItems}
+          addToCart={addToCart}
+          decFromCart={decFromCart}
+          removeFromCart={removeFromCart}
+          cartTotal={cartTotal}
+          setView={setView}
+          pedidoMinimo={pedidoMinimo}
+          onClose={() => setCartOpen(false)}
+        />
+      )}
+      {toast && (
+        <div className="toast-in" style={{
+          position: "fixed", top: 16, left: "50%", zIndex: 60,
+          background: C.ink, color: C.paper, padding: "10px 18px", borderRadius: 999,
+          fontSize: 12.5, fontWeight: 700, boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+          display: "flex", alignItems: "center", gap: 8, maxWidth: "90vw",
+        }}>
+          <Check size={14} /> {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -636,7 +785,7 @@ function Stamp({ children, size = 56, tone = "ink", rotate = -6 }) {
   );
 }
 
-function Header({ view, setView, cartCount, loteAtual }) {
+function Header({ view, setView, cartCount, loteAtual, customerSession, onAccountClick, onCartClick }) {
   return (
     <header style={{ borderBottom: `1px solid ${C.line}`, background: C.paper }}>
       <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -651,7 +800,17 @@ function Header({ view, setView, cartCount, loteAtual }) {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setView("carrinho")}
+            onClick={onAccountClick}
+            title={customerSession ? "Minha conta" : "Entrar"}
+            style={{
+              background: view === "perfil" ? C.ink : "none", border: `1px solid ${view === "perfil" ? C.ink : C.line}`,
+              borderRadius: 999, padding: 8, color: view === "perfil" ? C.paper : C.inkSoft, display: "flex", alignItems: "center",
+            }}
+          >
+            <User size={16} />
+          </button>
+          <button
+            onClick={onCartClick}
             style={{ background: C.ink, border: "none", borderRadius: 999, padding: "8px 14px", color: C.paper, display: "flex", alignItems: "center", gap: 8 }}
           >
             <ShoppingCart size={15} />
@@ -663,12 +822,357 @@ function Header({ view, setView, cartCount, loteAtual }) {
   );
 }
 
+function LoginModal({ onClose }) {
+  const [step, setStep] = useState("email"); // email | otp
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const enviarCodigo = async () => {
+    if (!isValidEmail(email)) { setError("digite um e-mail válido."); return; }
+    setLoading(true); setError("");
+    try {
+      const { error: err } = await supabaseClient.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
+      if (err) throw err;
+      setStep("otp");
+    } catch (e) {
+      setError("não conseguimos enviar o código agora. tenta de novo em instantes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmarCodigo = async () => {
+    if (otp.trim().length < 6) { setError("o código tem 6 dígitos."); return; }
+    setLoading(true); setError("");
+    try {
+      const { error: err } = await supabaseClient.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: "email" });
+      if (err) throw err;
+      onClose();
+    } catch (e) {
+      setError("código incorreto ou expirado. confere e tenta de novo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const entrarComGoogle = async () => {
+    await supabaseClient.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+  };
+
+  const inputStyle = { width: "100%", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "11px 12px", color: C.ink, fontSize: 14, marginTop: 8, textAlign: "center", letterSpacing: step === "otp" ? "0.3em" : "normal" };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,24,17,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
+    >
+      <div onClick={(e) => e.stopPropagation()} className="fade-up" style={{ background: C.white, borderRadius: 4, padding: 28, maxWidth: 360, width: "100%", position: "relative" }}>
+        <button onClick={onClose} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", color: C.inkFaint }}><X size={18} /></button>
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+          <Stamp size={44} rotate={-4}><User size={18} color={C.white} /></Stamp>
+        </div>
+        <h2 style={{ fontSize: 16, fontWeight: 700, textAlign: "center", marginBottom: 4, textTransform: "uppercase" }}>
+          {step === "email" ? "Entrar ou criar conta" : "Confirma seu e-mail"}
+        </h2>
+        <p style={{ fontSize: 12, color: C.inkFaint, textAlign: "center", marginBottom: 16 }}>
+          {step === "email" ? "sem senha — a gente manda um código" : `enviamos um código de 6 dígitos pra ${email}`}
+        </p>
+
+        {step === "email" ? (
+          <>
+            <input
+              type="email"
+              style={inputStyle}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && enviarCodigo()}
+              placeholder="seu@email.com"
+            />
+            {error && <p style={{ color: C.red, fontSize: 11.5, marginTop: 8, textAlign: "center" }}>{error}</p>}
+            <button onClick={enviarCodigo} disabled={loading} style={{
+              width: "100%", marginTop: 14, background: C.ink, color: C.paper, border: "none", borderRadius: 4,
+              padding: "12px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", opacity: loading ? 0.6 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              <Mail size={15} /> {loading ? "enviando…" : "Receber código por e-mail"}
+            </button>
+
+            <div className="flex items-center gap-3" style={{ margin: "18px 0" }}>
+              <div style={{ flex: 1, height: 1, background: C.line }} />
+              <span style={{ fontSize: 10.5, color: C.inkFaint, textTransform: "uppercase" }}>ou</span>
+              <div style={{ flex: 1, height: 1, background: C.line }} />
+            </div>
+
+            <button onClick={entrarComGoogle} style={{
+              width: "100%", background: C.white, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 4,
+              padding: "12px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.03em",
+            }}>
+              Entrar com Google
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              style={inputStyle}
+              value={otp}
+              maxLength={6}
+              inputMode="numeric"
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && confirmarCodigo()}
+              placeholder="------"
+            />
+            {error && <p style={{ color: C.red, fontSize: 11.5, marginTop: 8, textAlign: "center" }}>{error}</p>}
+            <button onClick={confirmarCodigo} disabled={loading} style={{
+              width: "100%", marginTop: 14, background: C.ink, color: C.paper, border: "none", borderRadius: 4,
+              padding: "12px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", opacity: loading ? 0.6 : 1,
+            }}>
+              {loading ? "confirmando…" : "Confirmar código"}
+            </button>
+            <button onClick={() => { setStep("email"); setOtp(""); setError(""); }} style={{
+              width: "100%", marginTop: 8, background: "none", border: "none", color: C.inkFaint, fontSize: 11.5,
+            }}>
+              usar outro e-mail
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatusTracker({ preparando, enviado }) {
+  const etapas = [
+    { label: "Recebido", ativo: true },
+    { label: "Preparando", ativo: preparando || enviado },
+    { label: "Enviado", ativo: enviado },
+  ];
+  return (
+    <div className="flex items-center" style={{ margin: "10px 0" }}>
+      {etapas.map((etapa, i) => (
+        <React.Fragment key={etapa.label}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{
+              width: 16, height: 16, borderRadius: "50%",
+              background: etapa.ativo ? C.cold : C.paperDim,
+              border: `1px solid ${etapa.ativo ? C.cold : C.line}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {etapa.ativo && <Check size={9} color={C.white} />}
+            </div>
+            <span style={{ fontSize: 9, color: etapa.ativo ? C.inkSoft : C.inkFaint, textTransform: "uppercase", letterSpacing: "0.02em", textAlign: "center" }}>{etapa.label}</span>
+          </div>
+          {i < etapas.length - 1 && (
+            <div style={{ flex: 1, height: 2, background: etapas[i + 1].ativo ? C.cold : C.line, marginBottom: 14 }} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function Perfil({ customerSession, profile, salvarPerfil, setView }) {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [cep, setCep] = useState("");
+  const [rua, setRua] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [salvo, setSalvo] = useState(false);
+  const [pedidos, setPedidos] = useState(null);
+
+  useEffect(() => {
+    if (!profile) return;
+    setNome(profile.nome || "");
+    setTelefone(profile.telefone || "");
+    setCep(profile.cep || "");
+    setRua(profile.rua || "");
+    setBairro(profile.bairro || "");
+    setNumero(profile.numero || "");
+    setComplemento(profile.complemento || "");
+  }, [profile]);
+
+  useEffect(() => {
+    if (!customerSession) return;
+    (async () => {
+      try {
+        const rows = await sbFetch(`orders?user_id=eq.${customerSession.user.id}&select=*&order=created_at.desc`, { accessToken: customerSession.access_token });
+        setPedidos(rows || []);
+      } catch (e) {
+        console.error("Falha ao carregar histórico de pedidos", e);
+        setPedidos([]);
+      }
+    })();
+  }, [customerSession]);
+
+  const buscarEndereco = async (valorCep) => {
+    const limpo = valorCep.replace(/\D/g, "");
+    if (limpo.length !== 8) return;
+    setBuscandoCep(true);
+    try {
+      const resultado = await buscarCep(limpo);
+      if (resultado) { setRua(resultado.rua); setBairro(resultado.bairro); }
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
+  const salvar = async () => {
+    await salvarPerfil({ nome, telefone, cep, rua, bairro, numero, complemento });
+    setSalvo(true);
+    setTimeout(() => setSalvo(false), 1800);
+  };
+
+  const sair = async () => {
+    await supabaseClient.auth.signOut();
+    setView("loja");
+  };
+
+  if (!customerSession) {
+    return (
+      <div style={{ paddingTop: 56, textAlign: "center" }}>
+        <p style={{ fontSize: 13, color: C.inkFaint }}>faça login pra ver sua conta.</p>
+      </div>
+    );
+  }
+
+  const inputStyle = { width: "100%", background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: "10px 12px", color: C.ink, fontSize: 13, marginTop: 6 };
+  const labelStyle = { fontSize: 11, color: C.inkSoft, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" };
+
+  return (
+    <div style={{ paddingTop: 26, maxWidth: 460 }} className="fade-up">
+      <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, textTransform: "uppercase" }}>Minha conta</h2>
+        <button onClick={sair} style={{ background: "none", border: "none", color: C.inkFaint, display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+          <LogOut size={14} /> sair
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: C.inkFaint, marginBottom: 18 }}>{customerSession.user.email}</p>
+
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 16, marginBottom: 20 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 12, color: C.inkSoft }}>Dados pessoais</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <label style={labelStyle}>Nome
+            <input style={inputStyle} value={nome} onChange={(e) => setNome(e.target.value)} />
+          </label>
+          <label style={labelStyle}>WhatsApp
+            <input style={inputStyle} value={telefone} onChange={(e) => setTelefone(formatTelefoneInput(e.target.value))} placeholder="(31) 90000-0000" />
+          </label>
+          <label style={labelStyle}>CEP (endereço padrão)
+            <input
+              style={inputStyle}
+              value={cep}
+              onChange={(e) => {
+                let v = e.target.value.replace(/\D/g, "").slice(0, 8);
+                if (v.length > 5) v = `${v.slice(0, 5)}-${v.slice(5)}`;
+                setCep(v);
+                if (v.replace(/\D/g, "").length === 8) buscarEndereco(v);
+              }}
+              placeholder="00000-000"
+            />
+          </label>
+          {buscandoCep && <p style={{ fontSize: 11, color: C.inkFaint }}>buscando endereço…</p>}
+          <label style={labelStyle}>Rua
+            <input style={inputStyle} value={rua} onChange={(e) => setRua(e.target.value)} />
+          </label>
+          <label style={labelStyle}>Bairro
+            <input style={inputStyle} value={bairro} onChange={(e) => setBairro(e.target.value)} />
+          </label>
+          <div className="flex gap-2">
+            <label style={{ ...labelStyle, flex: 1 }}>Número
+              <input style={inputStyle} value={numero} onChange={(e) => setNumero(e.target.value)} />
+            </label>
+            <label style={{ ...labelStyle, flex: 1 }}>Complemento
+              <input style={inputStyle} value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+            </label>
+          </div>
+        </div>
+        <button onClick={salvar} style={{
+          marginTop: 14, background: C.cold, color: C.white, border: "none", borderRadius: 4, padding: "10px 18px",
+          fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <Save size={14} /> {salvo ? "Salvo!" : "Salvar dados"}
+        </button>
+      </div>
+
+      <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10, color: C.inkSoft }}>Meus pedidos</p>
+      {pedidos === null ? (
+        <p style={{ fontSize: 12, color: C.inkFaint }}>carregando…</p>
+      ) : pedidos.length === 0 ? (
+        <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 24, textAlign: "center", color: C.inkFaint, fontSize: 12.5 }}>
+          você ainda não fez nenhum pedido logado com essa conta.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {pedidos.map((p) => (
+            <div key={p.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 12 }}>
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: 11, color: C.inkFaint }}>{new Date(p.created_at).toLocaleDateString("pt-BR")} · {p.lote}</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "2px 8px", borderRadius: 999,
+                  background: p.pago ? C.cold : C.paperDim, color: p.pago ? C.white : C.inkFaint,
+                }}>{p.pago ? "pago" : "pendente"}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 12.5, color: C.inkSoft }}>
+                {(p.itens || []).map((i, idx) => <div key={idx}>{i.qty}x {i.name}</div>)}
+              </div>
+              {p.pago && <StatusTracker preparando={p.preparando} enviado={p.enviado} />}
+              <div className="flex items-center justify-between" style={{ marginTop: 8, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 8 }}>
+                <span style={{ fontSize: 11, color: C.inkFaint }}>{p.entrega === "entrega" ? "entrega" : "retirada"}</span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{brl(p.total)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
+function Lightbox({ images, idx, setIdx, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(28,24,17,0.9)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: C.white }}><X size={26} /></button>
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + images.length) % images.length); }}
+          style={{ position: "absolute", left: 12, background: "none", border: "none", color: C.white, padding: 10 }}
+        ><ArrowLeft size={26} /></button>
+      )}
+      <img
+        src={images[idx]}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: "92vw", maxHeight: "85vh", objectFit: "contain", borderRadius: 4 }}
+      />
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % images.length); }}
+          style={{ position: "absolute", right: 12, background: "none", border: "none", color: C.white, padding: 10 }}
+        ><ArrowLeft size={26} style={{ transform: "rotate(180deg)" }} /></button>
+      )}
+      {images.length > 1 && (
+        <div style={{ position: "absolute", bottom: 20, display: "flex", gap: 6 }}>
+          {images.map((_, i) => (
+            <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i === idx ? C.white : "rgba(255,255,255,0.4)" }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProductImage({ product, loteAtual }) {
   const tint = CATEGORY_TINT[product.category] || DEFAULT_TINT;
   const soldOut = product.stock <= 0;
   const images = (product.images && product.images.length > 0) ? product.images : [];
   const [idx, setIdx] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchX = useRef(null);
 
   const clamp = (i) => Math.max(0, Math.min(images.length - 1, i));
@@ -685,16 +1189,24 @@ function ProductImage({ product, loteAtual }) {
       onTouchStart={images.length > 1 ? onTouchStart : undefined}
       onTouchEnd={images.length > 1 ? onTouchEnd : undefined}
       style={{
-        position: "relative", height: 150, overflow: "hidden",
+        position: "relative", aspectRatio: "1 / 1", width: "100%", overflow: "hidden",
         background: images.length > 0 ? C.kraftDark : `radial-gradient(circle at 35% 30%, ${tint}, ${C.kraftDark})`,
         display: "flex", alignItems: "center", justifyContent: "center",
         filter: soldOut ? "grayscale(0.85)" : "none", touchAction: images.length > 1 ? "pan-y" : "auto",
       }}>
       {images.length > 0 ? (
-        <img src={images[idx]} alt={product.name} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", userSelect: "none" }} />
+        <img
+          src={images[idx]}
+          alt={product.name}
+          draggable={false}
+          onClick={() => setLightboxOpen(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", userSelect: "none", cursor: "zoom-in" }}
+        />
       ) : (
         <span style={{ fontSize: 38, filter: "grayscale(0.35) sepia(0.15)" }}>{CATEGORY_ICON[product.category] || "🍽️"}</span>
       )}
+
+      {lightboxOpen && <Lightbox images={images} idx={idx} setIdx={setIdx} onClose={() => setLightboxOpen(false)} />}
 
       {images.length > 1 && (
         <div style={{ position: "absolute", bottom: 8, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 5 }}>
@@ -713,7 +1225,7 @@ function ProductImage({ product, loteAtual }) {
           {product.tags.map((tag) => {
             const color = tagHex(tag);
             return (
-              <span key={tag} style={{
+              <span key={tag} className="tag-sticker" style={{
                 background: color, color: C.white,
                 borderRadius: 3, padding: "3px 8px", fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em",
                 transform: "rotate(-4deg)", boxShadow: "0 2px 5px rgba(0,0,0,0.2)", textTransform: "uppercase",
@@ -762,7 +1274,7 @@ function ProductCard({ product, qty, onAdd, loteAtual, mostrarEstoque }) {
       opacity: soldOut ? 0.75 : 1, display: "flex", flexDirection: "column", height: "100%" 
     }}>
       <ProductImage product={product} loteAtual={loteAtual} />
-      <div style={{ padding: "14px 16px", borderTop: `1px dashed ${C.kraftLine}`, display: "flex", flexDirection: "column", flex: 1 }}>
+      <div style={{ padding: "18px 18px 20px", borderTop: `1px dashed ${C.kraftLine}`, display: "flex", flexDirection: "column", flex: 1 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>{product.name}</h3>
         <p style={{ fontSize: 11.5, color: C.inkSoft, lineHeight: 1.5, marginTop: 4, flex: 1 }}>
           <span style={{ color: C.inkSoft }}>{product.desc}</span>
@@ -794,11 +1306,19 @@ function ProductCard({ product, qty, onAdd, loteAtual, mostrarEstoque }) {
   );
 }
 
-function Store({ products, loading, cart, addToCart, setView, cartCount, heroTitle, heroSubtitle, loteAtual, mostrarEstoque }) {
+function Store({ products, loading, cart, addToCart, setView, cartCount, heroTitle, heroSubtitle, loteAtual, mostrarEstoque, onOpenCart, categories }) {
   const active = products.filter((p) => p.active !== false);
+  const categoriasComProduto = [...new Set(active.map((p) => p.category).filter(Boolean))];
+  const categoriasOrdenadas = [
+    ...(categories || []).filter((c) => categoriasComProduto.includes(c)),
+    ...categoriasComProduto.filter((c) => !(categories || []).includes(c)),
+  ];
+  const [categoriaFiltro, setCategoriaFiltro] = useState("Todos");
+  const visiveis = categoriaFiltro === "Todos" ? active : active.filter((p) => p.category === categoriaFiltro);
+
   return (
     <div>
-      <section style={{ padding: "32px 0 26px" }}>
+      <section style={{ padding: "40px 0 34px" }}>
         <p style={{ color: C.cold, fontSize: 11, marginBottom: 6, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>drop da semana</p>
         <h2 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.35, maxWidth: 520, textTransform: "uppercase" }}>
           {heroTitle}
@@ -808,15 +1328,48 @@ function Store({ products, loading, cart, addToCart, setView, cartCount, heroTit
         </p>
       </section>
 
+      {categoriasOrdenadas.length > 1 && (
+        <div className="flex gap-2" style={{ overflowX: "auto", paddingBottom: 14, marginBottom: 6, WebkitOverflowScrolling: "touch" }}>
+          {["Todos", ...categoriasOrdenadas].map((cat) => {
+            const ativo = categoriaFiltro === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategoriaFiltro(cat)}
+                style={{
+                  flexShrink: 0, padding: "7px 14px", borderRadius: 999, fontSize: 11.5, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap",
+                  background: ativo ? C.ink : C.white, color: ativo ? C.paper : C.inkSoft,
+                  border: `1px solid ${ativo ? C.ink : C.line}`,
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {loading ? (
-        <p style={{ color: C.inkFaint, fontSize: 13 }}>carregando catálogo…</p>
-      ) : active.length === 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
+              <div className="skeleton" style={{ aspectRatio: "1 / 1", width: "100%" }} />
+              <div style={{ padding: "18px 18px 20px" }}>
+                <div className="skeleton" style={{ height: 13, width: "70%", borderRadius: 3, marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 11, width: "100%", borderRadius: 3, marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 11, width: "50%", borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : visiveis.length === 0 ? (
         <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
-          nenhum item disponível neste drop no momento.
+          nenhum item disponível {categoriaFiltro !== "Todos" ? `em "${categoriaFiltro}"` : "neste drop"} no momento.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {active.map((p) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {visiveis.map((p) => (
             <ProductCard key={p.id} product={p} qty={cart[p.id] || 0} onAdd={addToCart} loteAtual={loteAtual} mostrarEstoque={mostrarEstoque} />
           ))}
         </div>
@@ -824,7 +1377,7 @@ function Store({ products, loading, cart, addToCart, setView, cartCount, heroTit
 
       {cartCount > 0 && (
         <button
-          onClick={() => setView("carrinho")}
+          onClick={onOpenCart}
           style={{
             position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
             background: C.ink, color: C.paper, border: "none", borderRadius: 999,
@@ -840,67 +1393,73 @@ function Store({ products, loading, cart, addToCart, setView, cartCount, heroTit
 }
 
 // ============================================================
-function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, setView, pedidoMinimo }) {
+function Cart({ cartItems, addToCart, decFromCart, removeFromCart, cartTotal, setView, pedidoMinimo, onClose }) {
   const minimo = Number(pedidoMinimo) || 0;
   const faltaParaMinimo = Math.max(0, minimo - cartTotal);
   const atingiuMinimo = faltaParaMinimo <= 0;
   const podeFinalizar = atingiuMinimo;
   return (
-    <div style={{ paddingTop: 26 }} className="fade-up">
-      <button onClick={() => setView("loja")} style={{ background: "none", border: "none", color: C.inkSoft, display: "flex", alignItems: "center", gap: 6, marginBottom: 18, fontSize: 12.5 }}>
-        <ArrowLeft size={15} /> continuar vendo o drop
-      </button>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Seu carrinho</h2>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(28,24,17,0.5)", zIndex: 50, display: "flex", justifyContent: "flex-end" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="drawer-slide"
+        style={{ background: C.paper, width: "100%", maxWidth: 420, height: "100%", overflowY: "auto", padding: "20px 20px 28px", boxShadow: "-6px 0 24px rgba(0,0,0,0.2)" }}
+      >
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.inkSoft, display: "flex", alignItems: "center", gap: 6, marginBottom: 18, fontSize: 12.5 }}>
+          <ArrowLeft size={15} /> continuar vendo o drop
+        </button>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Seu carrinho</h2>
 
-      {cartItems.length === 0 ? (
-        <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
-          carrinho vazio. volte pro drop e escolha alguns itens.
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {cartItems.map((item) => (
-              <div key={item.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{item.name}</p>
-                  <p style={{ fontSize: 12, color: C.inkSoft }}>{brl(item.price)} <span style={{ color: C.inkFaint }}>× {item.qty}</span></p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => decFromCart(item.id)} style={{ background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 4, width: 25, height: 25 }}><Minus size={12} /></button>
-                  <span style={{ width: 16, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{item.qty}</span>
-                  <button onClick={() => addToCart(item.id)} disabled={item.qty >= item.stock} style={{ background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 4, width: 25, height: 25, opacity: item.qty >= item.stock ? 0.4 : 1 }}><Plus size={12} /></button>
-                  <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", color: C.inkFaint, marginLeft: 4 }}><X size={15} /></button>
-                </div>
-              </div>
-            ))}
+        {cartItems.length === 0 ? (
+          <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
+            carrinho vazio. volte pro drop e escolha alguns itens.
           </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {cartItems.map((item) => (
+                <div key={item.id} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase" }}>{item.name}</p>
+                    <p style={{ fontSize: 12, color: C.inkSoft }}>{brl(item.price)} <span style={{ color: C.inkFaint }}>× {item.qty}</span></p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => decFromCart(item.id)} style={{ background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 4, width: 25, height: 25 }}><Minus size={12} /></button>
+                    <span style={{ width: 16, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{item.qty}</span>
+                    <button onClick={() => addToCart(item.id)} disabled={item.qty >= item.stock} style={{ background: C.paperDim, border: `1px solid ${C.line}`, borderRadius: 4, width: 25, height: 25, opacity: item.qty >= item.stock ? 0.4 : 1 }}><Plus size={12} /></button>
+                    <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", color: C.inkFaint, marginLeft: 4 }}><X size={15} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <div style={{ marginTop: 18, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: C.inkSoft, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em" }}>Subtotal</span>
-            <span style={{ fontSize: 18, color: C.ink, fontWeight: 700 }}>{brl(cartTotal)}</span>
-          </div>
+            <div style={{ marginTop: 18, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: C.inkSoft, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em" }}>Subtotal</span>
+              <span style={{ fontSize: 18, color: C.ink, fontWeight: 700 }}>{brl(cartTotal)}</span>
+            </div>
 
-          {!atingiuMinimo && (
-            <p style={{ fontSize: 11.5, color: C.red, marginTop: 8 }}>
-              pedido mínimo de {brl(minimo)} — faltam {brl(faltaParaMinimo)} pra liberar o checkout.
-            </p>
-          )}
+            {!atingiuMinimo && (
+              <p style={{ fontSize: 11.5, color: C.red, marginTop: 8 }}>
+                pedido mínimo de {brl(minimo)} — faltam {brl(faltaParaMinimo)} pra liberar o checkout.
+              </p>
+            )}
 
-          <button onClick={() => setView("checkout")} disabled={!podeFinalizar} style={{
-            width: "100%", marginTop: 16, background: podeFinalizar ? C.ink : C.paperDim,
-            color: podeFinalizar ? C.paper : C.inkFaint, border: "none",
-            borderRadius: 4, padding: "13px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em"
-          }}>
-            Finalizar pedido
-          </button>
-        </>
-      )}
+            <button onClick={() => { onClose(); setView("checkout"); }} disabled={!podeFinalizar} style={{
+              width: "100%", marginTop: 16, background: podeFinalizar ? C.ink : C.paperDim,
+              color: podeFinalizar ? C.paper : C.inkFaint, border: "none",
+              borderRadius: 4, padding: "13px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em"
+            }}>
+              Finalizar pedido
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 // ============================================================
-function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, fretePadraoDesconhecido, onStockDecremented, setPaymentLink }) {
+function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, setCart, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, horarios, intervaloEntrega, mensagemWhatsapp, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, fretePadraoDesconhecido, onStockDecremented, setPaymentLink, customerSession, profile, salvarPerfil, onOpenCart }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
@@ -915,6 +1474,8 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   const [complemento, setComplemento] = useState("");
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [erroCep, setErroCep] = useState("");
+  const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
+  const [autofillFeito, setAutofillFeito] = useState(false);
   const [diaEntrega, setDiaEntrega] = useState("");
   const [horarioEntrega, setHorarioEntrega] = useState("");
   const [erroData, setErroData] = useState("");
@@ -958,6 +1519,26 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
   };
 
   const cepValido = cep.replace(/\D/g, "").length === 8;
+
+  // preenche os campos automaticamente com os dados salvos no perfil, uma única vez
+  useEffect(() => {
+    if (!profile || autofillFeito) return;
+    if (profile.nome) setNome((v) => v || profile.nome);
+    if (profile.telefone) setTelefone((v) => v || profile.telefone);
+    if (profile.cep) setCep((v) => v || profile.cep);
+    if (profile.rua) setRua((v) => v || profile.rua);
+    if (profile.bairro) setBairro((v) => v || profile.bairro);
+    if (profile.numero) setNumero((v) => v || profile.numero);
+    if (profile.complemento) setComplemento((v) => v || profile.complemento);
+    setAutofillFeito(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  // e-mail vem da conta (auth), não do perfil — preenche assim que a sessão chega
+  useEffect(() => {
+    if (customerSession?.user?.email) setEmail((v) => v || customerSession.user.email);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerSession]);
 
   const buscarEnderecoPorCep = async (valorCep) => {
     const limpo = valorCep.replace(/\D/g, "");
@@ -1020,12 +1601,14 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
       entrega, endereco: enderecoCompleto,
       cep: entrega === "entrega" ? cep : "", rua: entrega === "entrega" ? rua : "",
       numero: entrega === "entrega" ? numero : "", complemento: entrega === "entrega" ? complemento : "",
+      bairro: entrega === "entrega" ? bairro : "",
       frete, data_horario: dataHorarioFinal, pagamento: "",
-      itens: cartItems.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
+      itens: cartItems.map((i) => ({ id: i.id, name: i.name, qty: i.qty, price: i.price, category: i.category })),
       subtotal: cartTotal, total,
+      user_id: customerSession ? customerSession.user.id : null,
     };
     try {
-      const rows = await sbFetch("orders", { method: "POST", body: pedidoDb, prefer: "return=representation" });
+      const rows = await sbFetch("orders", { method: "POST", body: pedidoDb, prefer: "return=representation", accessToken: customerSession ? customerSession.access_token : undefined });
       return rows && rows[0] ? rows[0].id : null;
     } catch (e) {
       console.error("Falha ao salvar pedido no Supabase", e);
@@ -1050,7 +1633,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
     try {
       const data = await createPaymentLink({
         handle: infinitepayHandle, items, orderNsu: orderId,
-        redirectUrl: window.location.origin,
+        redirectUrl: `${window.location.origin}${PEDIDO_CONFIRMADO_PATH}?id=${orderId}`,
         customer: {
           name: nome.trim(),
           email: email.trim(),
@@ -1079,6 +1662,10 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
     onStockDecremented(cartItems.map((i) => ({ id: i.id, qty: i.qty })));
     const orderId = await salvarPedido();
     await registrarBairroDesconhecido();
+
+    if (customerSession && salvarComoPadrao && entrega === "entrega") {
+      await salvarPerfil({ nome, telefone, cep, rua, bairro, numero, complemento });
+    }
 
     const msg = buildMessage();
     setLastMessage(msg);
@@ -1114,7 +1701,7 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
 
   return (
     <div style={{ paddingTop: 26, maxWidth: 460 }} className="fade-up">
-      <button onClick={() => setView("carrinho")} style={{ background: "none", border: "none", color: C.inkSoft, display: "flex", alignItems: "center", gap: 6, marginBottom: 18, fontSize: 12.5 }}>
+      <button onClick={onOpenCart} style={{ background: "none", border: "none", color: C.inkSoft, display: "flex", alignItems: "center", gap: 6, marginBottom: 18, fontSize: 12.5 }}>
         <ArrowLeft size={15} /> voltar ao carrinho
       </button>
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Finalizar pedido</h2>
@@ -1241,6 +1828,12 @@ function Checkout({ cartItems, cartTotal, setView, setLastMessage, products, set
                     <input style={inputStyle} value={complemento} maxLength={40} onChange={(e) => setComplemento(e.target.value)} placeholder="apto, bloco…" />
                   </label>
                 </div>
+                {customerSession && (
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={salvarComoPadrao} onChange={(e) => setSalvarComoPadrao(e.target.checked)} style={{ marginTop: 2 }} />
+                    <span style={{ fontSize: 12, color: C.inkSoft, lineHeight: 1.5, textTransform: "none" }}>Salvar este endereço como padrão no meu perfil</span>
+                  </label>
+                )}
               </>
             )}
           </>
@@ -1351,6 +1944,115 @@ function Sucesso({ message, setView, paymentLink, whatsappNumber }) {
   );
 }
 
+function PedidoConfirmado({ orderId, whatsappNumber }) {
+  const [pedido, setPedido] = useState(undefined); // undefined = carregando, null = não encontrado
+  const [tentativas, setTentativas] = useState(0);
+
+  const carregar = async () => {
+    if (!orderId) { setPedido(null); return; }
+    try {
+      const rows = await sbRpc("get_order_summary", { p_order_id: orderId });
+      setPedido(rows && rows[0] ? rows[0] : null);
+    } catch (e) {
+      console.error("Falha ao carregar resumo do pedido", e);
+      setPedido(null);
+    }
+  };
+
+  useEffect(() => { carregar(); }, [orderId]);
+
+  // se o pagamento ainda não apareceu confirmado, tenta de novo em alguns segundos
+  // (o webhook da InfinitePay pode chegar um instante depois do redirecionamento)
+  useEffect(() => {
+    if (pedido && !pedido.pago && tentativas < 3) {
+      const t = setTimeout(() => {
+        carregar();
+        setTentativas((n) => n + 1);
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido, tentativas]);
+
+  const voltarLoja = () => { window.location.href = "/"; };
+
+  if (pedido === undefined) {
+    return <p style={{ textAlign: "center", paddingTop: 56, fontSize: 13, color: C.inkFaint }}>carregando seu pedido…</p>;
+  }
+
+  if (pedido === null) {
+    return (
+      <div style={{ paddingTop: 56, textAlign: "center", maxWidth: 440, margin: "0 auto" }} className="fade-up">
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Pedido não encontrado</h2>
+        <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 18 }}>Não achamos esse pedido. Se você acabou de pagar, chama a gente pelo WhatsApp que confirmamos na hora.</p>
+        <button onClick={voltarLoja} style={{ background: C.ink, color: C.paper, border: "none", borderRadius: 4, padding: "11px 20px", fontWeight: 700, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Voltar à loja
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ paddingTop: 56, textAlign: "center", maxWidth: 440, margin: "0 auto" }} className="fade-up">
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <Stamp size={50} rotate={-4} tone={pedido.pago ? "ink" : "cold"}>
+          <Check color={C.white} size={22} />
+        </Stamp>
+      </div>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>
+        {pedido.pago ? "Pagamento confirmado!" : "Recebemos seu pedido"}
+      </h2>
+      <p style={{ color: C.inkSoft, fontSize: 13, marginBottom: 18 }}>
+        {pedido.pago
+          ? `Obrigado, ${pedido.nome.split(" ")[0]}! Já está tudo certo por aqui.`
+          : "Estamos confirmando seu pagamento — isso costuma ser rápido. Se demorar, chama a gente no WhatsApp."}
+      </p>
+
+      <div style={{ textAlign: "left", background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 16, marginBottom: 18 }}>
+        <p style={{ fontSize: 10.5, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8 }}>{pedido.lote}</p>
+        {(pedido.itens || []).map((i, idx) => (
+          <div key={idx} className="flex items-center justify-between" style={{ fontSize: 13, color: C.inkSoft, marginBottom: 4 }}>
+            <span>{i.qty}x {i.name}</span>
+            <span>{brl(i.qty * i.price)}</span>
+          </div>
+        ))}
+        <div style={{ borderTop: `1px dashed ${C.kraftLine}`, marginTop: 8, paddingTop: 8 }}>
+          <div className="flex items-center justify-between" style={{ fontSize: 12, color: C.inkFaint }}>
+            <span>Subtotal</span><span>{brl(pedido.subtotal)}</span>
+          </div>
+          {pedido.frete > 0 && (
+            <div className="flex items-center justify-between" style={{ fontSize: 12, color: C.inkFaint }}>
+              <span>Frete</span><span>{brl(pedido.frete)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between" style={{ fontSize: 15, fontWeight: 700, color: C.ink, marginTop: 4 }}>
+            <span>Total</span><span>{brl(pedido.total)}</span>
+          </div>
+        </div>
+        <div style={{ borderTop: `1px dashed ${C.kraftLine}`, marginTop: 10, paddingTop: 10, fontSize: 11.5, color: C.inkFaint, lineHeight: 1.6 }}>
+          <div>{pedido.entrega === "entrega" ? `entrega — ${pedido.endereco}` : "retirada"}</div>
+          <div>dia/horário: {pedido.data_horario}</div>
+        </div>
+      </div>
+
+      {whatsappNumber && (
+        <a
+          href={`https://wa.me/${formatPhoneE164(whatsappNumber).replace("+", "")}?text=${encodeURIComponent(`Oi! Meu pedido ${pedido.pago ? "foi pago" : "está com pagamento pendente"} — código ${pedido.id.slice(0, 8)}.`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: "block", fontSize: 11.5, color: C.cold, marginBottom: 18, textDecoration: "none" }}
+        >
+          dúvidas sobre o pedido? fala com a gente pelo WhatsApp
+        </a>
+      )}
+
+      <button onClick={voltarLoja} style={{ background: C.ink, color: C.paper, border: "none", borderRadius: 4, padding: "11px 20px", fontWeight: 700, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Voltar à loja
+      </button>
+    </div>
+  );
+}
+
 // ============================================================
 function AdminLogin({ email, setEmail, password, setPassword, error, loading, onSubmit }) {
   return (
@@ -1389,6 +2091,7 @@ function emptyProduct(loteAtual) {
 
 function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, whatsappNumber, deliveryZones, pedidoMinimo, mostrarEstoque, lojaAberta, horarios, mensagemWhatsapp, mensagemContato, mensagemCobranca, infinitepayHandle, infinitepayLogoUrl, entregaAtiva, retiradaAtiva, categories, intervaloEntrega, fretePadraoDesconhecido, saveConfig, accessToken, onLogout }) {
   const [editing, setEditing] = useState(null);
+  const [draggedId, setDraggedId] = useState(null);
   const [titleDraft, setTitleDraft] = useState(heroTitle);
   const [categoriesDraft, setCategoriesDraft] = useState(
     categories && categories.length > 0 ? [...categories] : DEFAULT_CATEGORIES
@@ -1514,9 +2217,9 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
       </div>
 
       {tab === "relatorios" && (
-        <div style={{ border: `1px dashed ${C.kraftLine}`, borderRadius: 4, padding: 32, textAlign: "center", color: C.inkFaint, fontSize: 13 }}>
-          relatórios em construção — em breve por aqui.
-        </div>
+        <React.Suspense fallback={<p style={{ fontSize: 13, color: C.inkFaint }}>carregando relatórios…</p>}>
+          <RelatoriosPanel accessToken={accessToken} />
+        </React.Suspense>
       )}
 
       {tab === "pedidos" && <OrdersPanel accessToken={accessToken} infinitepayHandle={infinitepayHandle} mensagemContato={mensagemContato} mensagemCobranca={mensagemCobranca} />}
@@ -1826,10 +2529,28 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {products.map((p) => (
-          <div key={p.id} style={{
-            background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 12,
-            display: "flex", alignItems: "center", gap: 12, opacity: p.active === false ? 0.55 : 1
-          }}>
+          <div
+            key={p.id}
+            draggable
+            onDragStart={() => setDraggedId(p.id)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => {
+              if (!draggedId || draggedId === p.id) return;
+              const atual = [...products];
+              const de = atual.findIndex((x) => x.id === draggedId);
+              const para = atual.findIndex((x) => x.id === p.id);
+              const [movido] = atual.splice(de, 1);
+              atual.splice(para, 0, movido);
+              persistProducts(atual.map((x, i) => ({ ...x, posicao: i })));
+              setDraggedId(null);
+            }}
+            style={{
+              background: C.white, border: `1px solid ${C.line}`, borderRadius: 4, padding: 12,
+              display: "flex", alignItems: "center", gap: 12, opacity: p.active === false ? 0.55 : (draggedId === p.id ? 0.4 : 1),
+              cursor: "grab",
+            }}
+          >
+            <GripVertical size={16} color={C.inkFaint} style={{ flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase" }}>
                 {p.name} {p.frozen && <Snowflake size={12} color={C.cold} />}
@@ -1850,6 +2571,7 @@ function Admin({ products, saveProducts, heroTitle, heroSubtitle, loteAtual, wha
           </div>
         ))}
       </div>
+      <p style={{ fontSize: 10, color: C.inkFaint, marginTop: 8 }}>arraste pelo ícone ⠿ pra reordenar como os produtos aparecem na loja. funciona melhor no computador — no celular, edite a ordem por aqui mesmo.</p>
       </>
       )}
     </div>
@@ -1937,7 +2659,7 @@ function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagem
         aceitaNovidades: o.aceita_novidades, entrega: o.entrega, endereco: o.endereco, frete: Number(o.frete) || 0,
         dataHorario: o.data_horario, pagamento: o.pagamento, itens: o.itens || [],
         subtotal: Number(o.subtotal) || 0, total: Number(o.total) || 0,
-        pago: !!o.pago, enviado: !!o.enviado, enviadoEm: o.enviado_em, paymentLink: o.payment_link || "",
+        pago: !!o.pago, enviado: !!o.enviado, preparando: !!o.preparando, enviadoEm: o.enviado_em, paymentLink: o.payment_link || "",
       })));
     } catch (e) {
       console.error("Falha ao carregar pedidos do Supabase", e);
@@ -1986,7 +2708,7 @@ function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagem
       if (order.frete > 0) items.push({ quantity: 1, price: Math.round(order.frete * 100), description: "Frete" });
       const data = await createPaymentLink({
         handle: infinitepayHandle, items, orderNsu: order.id,
-        redirectUrl: window.location.origin,
+        redirectUrl: `${window.location.origin}${PEDIDO_CONFIRMADO_PATH}?id=${order.id}`,
         customer: { name: order.nome, email: order.email, phone_number: formatPhoneE164(order.telefone) },
       });
       const link = data?.url;
@@ -2114,6 +2836,8 @@ function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagem
               {o.enviado && o.enviadoEm && <div>enviado em: {new Date(o.enviadoEm).toLocaleString("pt-BR")}</div>}
             </div>
 
+            {o.pago && <StatusTracker preparando={o.preparando} enviado={o.enviado} />}
+
             <div className="flex items-center gap-2" style={{ marginTop: 12, borderTop: `1px dashed ${C.kraftLine}`, paddingTop: 10, flexWrap: "wrap" }}>
               <button
                 disabled={busyId === o.id}
@@ -2126,6 +2850,18 @@ function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagem
                 }}
               >
                 <Check size={12} /> {o.pago ? "pago" : "marcar pago"}
+              </button>
+              <button
+                disabled={busyId === o.id}
+                onClick={() => toggleCampo(o.id, "preparando", o.preparando)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 999, fontSize: 11,
+                  textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.03em",
+                  background: o.preparando ? C.cold : C.paper, color: o.preparando ? C.white : C.inkSoft,
+                  border: `1px solid ${o.preparando ? C.cold : C.line}`,
+                }}
+              >
+                <Snowflake size={12} /> {o.preparando ? "em preparo" : "marcar em preparo"}
               </button>
               <button
                 disabled={busyId === o.id}
@@ -2187,3 +2923,5 @@ function OrdersPanel({ accessToken, infinitepayHandle, mensagemContato, mensagem
     </div>
   );
 }
+
+export { C, brl, sbFetch, formatCaptureMethod };
